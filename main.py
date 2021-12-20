@@ -1,8 +1,9 @@
+import time
 import argparse
 import warnings
 warnings.filterwarnings('ignore')
 
-from backbone import getNetwork
+from torch.utils.tensorboard import SummaryWriter
 
 from utils import configuration, show_test_acc
 from dataset import get_data_loader, get_data_set
@@ -18,10 +19,10 @@ def main(args):
 
     network = get_network(cfg["network"], n_class)
 
-    result = run(dataset, dataloader, network, cfg["run"])
+    writer = SummaryWriter(f'tensorboards/{str(time.time())[:9]}_{args.config.split("/")[1].split(".")[0]}')
+    result = run(dataset, dataloader, network, cfg["run"], writer)
 
     show_test_acc(result)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="config")

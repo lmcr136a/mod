@@ -1,20 +1,15 @@
 data:
   dir: "CIFAR100" # directory path or "CIFAR10" or "CIFAR100"
   resize: 32 # Resize factor, integer number
-  # Sampling options for dataloader
   train:
     augmentation:
-      sift:   # circle   or   default   or   blur_circle
-      edge: 
-      gabor: 
-      perspective: # True or False
     shuffle: True
-    batch_size: 32
-    n_workers: 2
+    batch_size: 128
+    n_workers: 4
     pin_memory: True
   val:
     shuffle: False
-    batch_size: 128
+    batch_size: 64
     n_workers: 1
     pin_memory: True
   test:
@@ -24,14 +19,16 @@ data:
     pin_memory: True
 
 network:
-  backbone: "resnet18"
+  backbone: "resnet20"
 
 run:
-  epoch: 100
-  val_interval: 5
-  print_interval: 1
   loss: crossentropy
   optimizer:
     name: "adam"
     lr: 1.0e-2
-  scheduler: # use this if neccessary
+    
+  epoch: 3
+  val_interval: 2
+  print_interval: 1
+  plot_interval: 1
+  figure_interval: 1

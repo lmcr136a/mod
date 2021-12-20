@@ -1,16 +1,12 @@
+import os
 import torch
+import torchvision
 from torch import nn
 from torch.utils.data import Dataset, DataLoader
-import torchvision
 from torchvision import datasets, transforms, utils
 from torchvision.transforms import (
     ToTensor, Lambda, Compose, Resize, RandomHorizontalFlip, RandomRotation)
 from torchvision.transforms.transforms import RandomPerspective
-from skills.key_point import SIFT, HarrisCorner
-from skills.edge_detectoin import EDGE
-from skills.texture import *
-import os
-
 
 def get_data_set(cfg_data):
     """
@@ -20,7 +16,7 @@ def get_data_set(cfg_data):
             {"train": trainDataSet, "val": valDataSet, "test": testDataSet}
     """
 
-    cudnn.benchmark = True
+    # cudnn.benchmark = True
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -48,7 +44,6 @@ def get_data_set(cfg_data):
     }
 
     print("[ DATADIR ] ", cfg_data["dir"])
-    print("[ AUGMENT ] [resize]",resize,end='')
 
     if cfg_data["dir"] == "CIFAR10":
         imgsets = {'train': torchvision.datasets.CIFAR10(root="./data",train=True,transform=preprocess['train'],download=True),
