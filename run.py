@@ -80,11 +80,11 @@ def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, devic
         if (epoch+1) % cfg_run["plot_interval"] == 0:
             writer.add_scalar('Training loss',
                             LossMeter.avg,
-                            epoch * len(dataloader['train']))
+                            epoch)
         if (epoch+1) % cfg_run["figure_interval"] == 0:
             writer.add_figure('training prediction',
                             plot_classes_preds(network, inputs, labels),
-                            global_step=epoch * len(dataloader['train']))
+                            global_step=epoch)
 
         # Validation ##################################===============###########=========########
         if (epoch+1) % cfg_run["val_interval"] == 0:
@@ -114,10 +114,10 @@ def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, devic
             ##### plot
             writer.add_scalar('Validation loss',
                 LossMeter.avg,
-                epoch * len(dataloader['train']))
+                epoch )
             writer.add_figure('validation prediction',
                             plot_classes_preds(network, inputs, labels),
-                            global_step=epoch * len(dataloader['train']))
+                            global_step=epoch )
             if Top1Meter.avg >= best_acc:
                 best_network = network
                 best_acc = Top1Meter.avg

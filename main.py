@@ -1,9 +1,6 @@
-import time
 import argparse
 import warnings
 warnings.filterwarnings('ignore')
-
-from torch.utils.tensorboard import SummaryWriter
 
 from utils import configuration, show_test_acc
 from dataset import get_data_loader, get_data_set
@@ -12,14 +9,13 @@ from run import run
 
 
 def main(args):
-    cfg = configuration(args.config)
+    cfg, writer = configuration(args.config)
 
     dataset, n_class = get_data_set(cfg["data"])
     dataloader = get_data_loader(dataset, cfg["data"])
 
     network = get_network(cfg["network"], n_class)
 
-    writer = SummaryWriter(f'tensorboards/{str(time.time())[:9]}_{args.config.split("/")[1].split(".")[0]}')
     result = run(dataset, dataloader, network, cfg["run"], writer)
 
     show_test_acc(result)

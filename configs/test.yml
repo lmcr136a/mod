@@ -25,10 +25,10 @@ run:
   loss: crossentropy
   optimizer:
     name: "adam"
-    lr: 1.0e-2
+    lr: 5.0e-4
     
-  epoch: 3
-  val_interval: 2
-  print_interval: 1
+  epoch: 100
+  val_interval: 10
+  print_interval: 10
   plot_interval: 1
-  figure_interval: 1
+  figure_interval: 10
