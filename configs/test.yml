@@ -27,8 +27,8 @@ run:
     name: "adam"
     lr: 5.0e-4
     
-  epoch: 100
-  val_interval: 10
-  print_interval: 10
+  epoch: 2
+  val_interval: 1
+  print_interval: 1
   plot_interval: 1
-  figure_interval: 10
+  figure_interval: 1

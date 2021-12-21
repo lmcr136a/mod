@@ -1,3 +1,4 @@
+import sys
 import argparse
 import warnings
 warnings.filterwarnings('ignore')
@@ -19,6 +20,8 @@ def main(args):
     result = run(dataset, dataloader, network, cfg["run"], writer)
 
     show_test_acc(result)
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="config")
