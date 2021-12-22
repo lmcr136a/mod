@@ -22,4 +22,6 @@ def get_resnet(cfg_network, n_class):
 
 
 def get_network(cfg_network, n_class):
-    return get_resnet(cfg_network, n_class)
+    model = get_resnet(cfg_network, n_class)
+    print("[MODEL] Number of parameters : ", sum(p.numel() for p in model.parameters() if p.requires_grad))
+    return model
