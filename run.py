@@ -1,4 +1,5 @@
 import time
+import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -24,10 +25,14 @@ def run(dataset, dataloader, network, cfg_run, writer):
     optimizer = get_optimizer(cfg_run, network)
 
     print(f"[LOSS FUNC] {criterion}  [OPTIMIZER] {optimizer}")
-    print("\n====================== TRAINING START! =====================")
 
-    best_network = trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, device, writer)
-
+    if cfg_run["load_state"]:
+        print("\n====================== LOADING STATES... =====================")
+        best_network = network.load_state_dict(torch.load(cfg_run["load_state"]))
+    else:
+        print("\n====================== TRAINING START! =====================")
+        best_network = trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, device, writer)
+        torch.save(best_network.state_dict(), writer.log_dir+"/best_model.pt")
     test_accuracy = test(dataset, dataloader, best_network, criterion, device)
     
     return test_accuracy
@@ -44,7 +49,6 @@ def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, devic
     best_network = None
     TimeMeter = AverageMeter()
     start = time.time()
-
     for epoch in range(cfg_run["epoch"]):
         BetchTimeMeter = AverageMeter()
         LossMeter = AverageMeter()
