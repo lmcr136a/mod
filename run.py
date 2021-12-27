@@ -3,6 +3,8 @@ import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from tqdm import tqdm
+from utils import show_test_acc
 from metrics import AverageMeter, accuracy
 from figure import plot_classes_preds
 
@@ -27,14 +29,23 @@ def run(dataset, dataloader, network, cfg_run, writer):
     print(f"[LOSS FUNC] {criterion}  [OPTIMIZER] {optimizer}")
 
     if cfg_run["load_state"]:
-        print("\n====================== LOADING STATES... =====================")
-        best_network = network.load_state_dict(torch.load(cfg_run["load_state"]))
+        print("\n====================== LOADING STATES...")
+        network.load_state_dict(torch.load(cfg_run["load_state"]))
+        print("\n============================== COMPLETE!")
     else:
         print("\n====================== TRAINING START! =====================")
-        best_network = trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, device, writer)
-        torch.save(best_network.state_dict(), writer.log_dir+"/best_model.pt")
-    test_accuracy = test(dataset, dataloader, best_network, criterion, device)
+        network = trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, device, writer)
+        torch.save(network.state_dict(), writer.log_dir+"/best_model.pt")
+
+    # test_accuracy = test(dataset, dataloader, network, criterion, device)
     
+    if cfg_run['target_classes']:
+        # show_test_acc(test_accuracy)
+        learn_table(dataloader, network, device)
+        network.show_table()
+        network = prune_network(cfg_run, network)
+        
+    test_accuracy = test(dataset, dataloader, network, criterion, device)
     return test_accuracy
 
 
@@ -140,8 +151,9 @@ def test(dataset, dataloader, network, criterion, device):
     running_loss = 0.0
     running_corrects = 0
 
+    c = 0
     with torch.no_grad():
-        for inputs, labels in dataloader['test']:
+        for inputs, labels in tqdm(dataloader['test'], desc="TESTING"):
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
@@ -154,12 +166,46 @@ def test(dataset, dataloader, network, criterion, device):
             prec1 = accuracy(output.data, labels)[0]
             LossMeter.update(loss.item(), inputs.size(0))
             Top1Meter.update(prec1.item(), inputs.size(0))
+            # c += 1
+            # if c > 50:
+            #     break
 
     print(f'**[TEST] Loss {LossMeter.val:.4f} ({LossMeter.avg:.4f})\t Acc: {Top1Meter.val:.3f} ({Top1Meter.avg:.3f})\t')
     print()
 
     return Top1Meter.avg
 
+
+def learn_table(dataloader, network, device):
+    """
+    test accuracy 반환, 여기서도 dataset, dataloader는 dictionary type이다.
+    """
+    network.eval()
+    network.learn_table()
+
+    c = 0
+    with torch.no_grad():
+        for inputs, labels in tqdm(dataloader['test'], desc="Learning Table"):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            ## COMPUTE
+            output = network(inputs)
+            output = output.float()
+            ###
+            prediction = get_topk_idx(output.data)
+            mask = prediction.eq(labels).float()
+            network.update_table(mask, labels)
+            # c += 1
+            # if c > 50:
+            #     break
+    network.finish_learning_table()
+    return network
+
+
+def prune_network(cfg_run, network):
+    target_classes = cfg_run["target_classes"]
+    network.prune(target_classes)
+    return network
 
 def is_cuda():
     if torch.cuda.is_available():
@@ -169,6 +215,9 @@ def is_cuda():
         print("[ DEVICE  ] No CUDA. Working on CPU.")
         return "cpu"
 
+def get_topk_idx(batch_out, k=1):
+    output = batch_out.reshape(batch_out.shape[0],-1)
+    return torch.topk(output, k, dim=1)[1][:,0]
 
 def get_loss(cfg_run):
     return {
@@ -181,7 +230,7 @@ def get_optimizer(cfg_run, network):
     if name == "adam":
         return optim.Adam(network.parameters(), lr=cfg_run["optimizer"]["lr"])
     if name == "SGD":
-        return optim.SGD(model.parameters(), args.lr,
+        return optim.SGD(network.parameters(), lr=cfg_run["optimizer"]["lr"],
                                 momentum=0.9,
                                 weight_decay=1e-4)
 
