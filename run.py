@@ -39,13 +39,20 @@ def run(dataset, dataloader, network, cfg_run, writer):
 
     # test_accuracy = test(dataset, dataloader, network, criterion, device)
     
-    if cfg_run['target_classes']:
+    if cfg_run['table_dir']:
+        # show_test_acc(test_accuracy)
+        network.eval()
+        network.load_table(cfg_run['table_dir'])
+        network = prune_network(cfg_run, network)
+
+    elif cfg_run['target_classes'] and cfg_run['table_dir'] is None:
         # show_test_acc(test_accuracy)
         learn_table(dataloader, network, device)
-        network.show_table()
+        network.save_table()
         network = prune_network(cfg_run, network)
         
-    test_accuracy = test(dataset, dataloader, network, criterion, device)
+
+    test_accuracy = test(dataset, dataloader, network, criterion, device, cfg_run["target_classes"])
     return test_accuracy
 
 
@@ -139,7 +146,7 @@ def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, devic
     return best_network
 
 
-def test(dataset, dataloader, network, criterion, device):
+def test(dataset, dataloader, network, criterion, device, target_classes=None):
     """
     test accuracy 반환, 여기서도 dataset, dataloader는 dictionary type이다.
     """
@@ -148,12 +155,14 @@ def test(dataset, dataloader, network, criterion, device):
     network.eval()
 
     # Do validation with test dataset
-    running_loss = 0.0
-    running_corrects = 0
 
     c = 0
     with torch.no_grad():
         for inputs, labels in tqdm(dataloader['test'], desc="TESTING"):
+            if target_classes:
+                if labels[0] not in target_classes:
+                    continue
+            
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
@@ -166,9 +175,9 @@ def test(dataset, dataloader, network, criterion, device):
             prec1 = accuracy(output.data, labels)[0]
             LossMeter.update(loss.item(), inputs.size(0))
             Top1Meter.update(prec1.item(), inputs.size(0))
-            # c += 1
-            # if c > 50:
-            #     break
+            if c< 20:
+                c += 1
+                print(labels[0])
 
     print(f'**[TEST] Loss {LossMeter.val:.4f} ({LossMeter.avg:.4f})\t Acc: {Top1Meter.val:.3f} ({Top1Meter.avg:.3f})\t')
     print()
@@ -195,16 +204,16 @@ def learn_table(dataloader, network, device):
             prediction = get_topk_idx(output.data)
             mask = prediction.eq(labels).float()
             network.update_table(mask, labels)
-            # c += 1
-            # if c > 50:
-            #     break
     network.finish_learning_table()
     return network
 
 
 def prune_network(cfg_run, network):
-    target_classes = cfg_run["target_classes"]
-    network.prune(target_classes)
+    if cfg_run["prune_classes"] is None:
+        prune_classes = cfg_run["target_classes"]
+    prune_classes = cfg_run["prune_classes"]
+    prune_layer = cfg_run["prune_layer"]
+    network.prune(prune_classes, prune_layer)
     return network
 
 def is_cuda():

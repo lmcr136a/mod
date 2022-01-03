@@ -2,8 +2,8 @@ data/
 tensorboards/
 .vscode/
 
-
-
+dcp/
+setup.py
 
 
 

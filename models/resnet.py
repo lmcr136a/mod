@@ -59,14 +59,12 @@ class LambdaLayer(nn.Module):
 
 class BasicBlock(nn.Module):
     expansion = 1
-    k = 0.5
-    p = 1
     conv1_batch_table = []
     conv2_batch_table = []
     learning = False
     a = True
 
-    def __init__(self, in_planes, planes, num_classes, stride=1, option='A'):
+    def __init__(self, in_planes, planes, num_classes, stride=1, option='A', k=0.5, p=0.9):
         super(BasicBlock, self).__init__()
         self.kernel_size1, self.stride1, self.padding1, self.bias1 = 3, stride, 1, False
         self.kernel_size2, self.stride2, self.padding2, self.bias2 = 3, 1, 1, False
@@ -88,6 +86,8 @@ class BasicBlock(nn.Module):
                      nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False),
                      nn.BatchNorm2d(self.expansion * planes)
                 )
+        self.k = k
+        self.p = p
         self.learning_k = round(self.k*planes)
         self.conv1_wtable = torch.zeros(num_classes, planes).cuda()
         self.conv2_wtable = torch.zeros(num_classes, planes).cuda()
@@ -131,8 +131,9 @@ class BasicBlock(nn.Module):
         self.conv1_batch_table = []
         # self.conv2_batch_table = []
 
-    def prune(self, target_classes):
+    def prune(self, target_classes, layer_index="layer", block_index=0):
         output_filter_num = round(self.p*self.conv1.weight.shape[0])
+        print(layer_index+"_"+str(block_index)+" : output_filter_num / filter_num :  ", output_filter_num, " / ", self.conv1.weight.shape[0])
         filter_score = self.conv1_wtable[target_classes]  # [filter1_score, filter2_score, ...., filter16_score] * target_classes
         v, top_filters = torch.topk(filter_score, output_filter_num)  # [top1_filter, top2_filter, ..., top8_filter] * target_classes
 
@@ -164,8 +165,6 @@ class BasicBlock(nn.Module):
         self.conv1.weight = torch.nn.Parameter(conv1_weight, requires_grad=False)
         self.conv2.weight = torch.nn.Parameter(conv2_weight, requires_grad=False)
 
-    def show_table(self):
-        print(self.conv1_wtable[:10])
 
     def learn_table(self):
         self.learning = True
@@ -175,25 +174,26 @@ class BasicBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes):
+    def __init__(self, block, num_blocks, num_classes, logdir, k, p):
         super(ResNet, self).__init__()
         self.in_planes = 16
         self.num_classes = num_classes
 
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
-        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
-        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
-        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
+        self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1, k=k, p=p)
+        self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2, k=k, p=p)
+        self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2, k=k, p=p)
         self.linear = nn.Linear(64, num_classes)
 
         self.apply(_weights_init)
+        self.logdir = logdir
 
-    def _make_layer(self, block, planes, num_blocks, stride):
+    def _make_layer(self, block, planes, num_blocks, stride, k=0.5, p=0.9):
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
-            layers.append(block(self.in_planes, planes, self.num_classes, stride))
+            layers.append(block(self.in_planes, planes, self.num_classes, stride, k=k, p=p))
             self.in_planes = planes * block.expansion
 
         return nn.Sequential(*layers)
@@ -216,13 +216,19 @@ class ResNet(nn.Module):
         for i in range(len(self.layer3)):
             self.layer3[i].save_cw_table(mask, labels, 3, i)
 
-    def prune(self, target_classes):
-        for i in range(len(self.layer1)):
-            self.layer1[i].prune(target_classes)
-        for i in range(len(self.layer2)):
-            self.layer2[i].prune(target_classes)
-        for i in range(len(self.layer3)):
-            self.layer3[i].prune(target_classes)
+    def prune(self, prune_classes, prune_layer):
+        """
+        prune_layer : 
+            ex) [(1, 2)] => prune layer1 block2
+            ex) [(1, 2), (2, 2)] => layer1 block2, layer2 block2
+        """
+        for layer_idx, block_idx in prune_layer:
+            if layer_idx == 1:
+                self.layer1[block_idx].prune(prune_classes, "layer1", block_idx)
+            if layer_idx == 2:
+                self.layer2[block_idx].prune(prune_classes, "layer2", block_idx)
+            if layer_idx == 3:
+                self.layer3[block_idx].prune(prune_classes, "layer3", block_idx)
 
     def learn_table(self):
         for i in range(len(self.layer1)):
@@ -240,40 +246,50 @@ class ResNet(nn.Module):
         for i in range(len(self.layer3)):
             self.layer3[i].finish_learning_table()
 
-    def show_table(self):
-        print("layer1")
+    def save_table(self):
+        table_dict = {}
         for i in range(len(self.layer1)):
-            self.layer1[i].show_table()
-        print("layer2")
+            table_dict.update({f"layer1_{i}": self.layer1[i].conv1_wtable})
         for i in range(len(self.layer2)):
-            self.layer2[i].show_table()
-        print("layer3")
+            table_dict.update({f"layer2_{i}": self.layer2[i].conv1_wtable})
         for i in range(len(self.layer3)):
-            self.layer3[i].show_table()
+            table_dict.update({f"layer3_{i}": self.layer3[i].conv1_wtable})
+
+        torch.save(table_dict, self.logdir+"/table.dict")
+
+    def load_table(self, logdir):
+        table_dict = torch.load(logdir+"/table.dict")
+        for i in range(len(self.layer1)):
+            self.layer1[i].conv1_wtable = table_dict[f"layer1_{i}"].cuda()
+        for i in range(len(self.layer2)):
+            self.layer2[i].conv1_wtable = table_dict[f"layer2_{i}"].cuda()
+        for i in range(len(self.layer3)):
+            self.layer3[i].conv1_wtable = table_dict[f"layer3_{i}"].cuda()
 
 
-def resnet20(num_classes, whether_prune):
-    return ResNet(BasicBlock, [3, 3, 3], num_classes)
+
+def resnet20(num_classes, logdir, k, p):
+    return ResNet(BasicBlock, [3, 3, 3], num_classes, logdir, k, p)
 
 
-def resnet32(num_classes, whether_prune):
-    return ResNet(BasicBlock, [5, 5, 5], num_classes)
+def resnet32(num_classes, logdir, k, p):
+    return ResNet(BasicBlock, [5, 5, 5], num_classes, logdir, k, p)
 
 
-def resnet44(num_classes, whether_prune):
-    return ResNet(BasicBlock, [7, 7, 7], num_classes)
+def resnet44(num_classes, logdir, k, p):
+    return ResNet(BasicBlock, [7, 7, 7], num_classes, logdir, k, p)
 
 
-def resnet56(num_classes, whether_prune):
-    return ResNet(BasicBlock, [9, 9, 9], num_classes)
+def resnet56(num_classes, logdir, k, p):
+    return ResNet(BasicBlock, [9, 9, 9], num_classes, logdir, k, p)
 
 
-def resnet110(num_classes, whether_prune):
-    return ResNet(BasicBlock, [18, 18, 18], num_classes)
+def resnet110(num_classes, logdir, k, p):
+    return ResNet(BasicBlock, [18, 18, 18], num_classes, logdir, k, p)
 
 
-def resnet1202(num_classes, whether_prune):
-    return ResNet(BasicBlock, [200, 200, 200], num_classes)
+def resnet1202(num_classes, logdir, k, p):
+    return ResNet(BasicBlock, [200, 200, 200], num_classes, logdir, k, p)
 
 
 def test(net):
