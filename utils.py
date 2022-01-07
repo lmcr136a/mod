@@ -18,10 +18,10 @@ def configuration(config):
     sys.stdout = f
     with open(config, encoding="utf-8") as fp:
         cfg = yaml.load(fp, Loader=yaml.FullLoader)
-    cfg["network"].update({"logdir": tb_dir})
-    
+        
     with open(tb_dir+"/"+config.split("/")[1], "w") as f:
         yaml.dump(cfg, f)
+
     return cfg, writer
 
 def show_test_acc(result):

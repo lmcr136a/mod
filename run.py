@@ -3,8 +3,6 @@ import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from tqdm import tqdm
-from utils import show_test_acc
 from metrics import AverageMeter, accuracy
 from figure import plot_classes_preds
 
@@ -29,30 +27,14 @@ def run(dataset, dataloader, network, cfg_run, writer):
     print(f"[LOSS FUNC] {criterion}  [OPTIMIZER] {optimizer}")
 
     if cfg_run["load_state"]:
-        print("\n====================== LOADING STATES...")
-        network.load_state_dict(torch.load(cfg_run["load_state"]))
-        print("\n============================== COMPLETE!")
+        print("\n====================== LOADING STATES... =====================")
+        best_network = network.load_state_dict(torch.load(cfg_run["load_state"]))
     else:
         print("\n====================== TRAINING START! =====================")
-        network = trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, device, writer)
-        torch.save(network.state_dict(), writer.log_dir+"/best_model.pt")
-
-    # test_accuracy = test(dataset, dataloader, network, criterion, device)
+        best_network = trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, device, writer)
+        torch.save(best_network.state_dict(), writer.log_dir+"/best_model.pt")
+    test_accuracy = test(dataset, dataloader, best_network, criterion, device)
     
-    if cfg_run['table_dir']:
-        # show_test_acc(test_accuracy)
-        network.eval()
-        network.load_table(cfg_run['table_dir'])
-        network = prune_network(cfg_run, network)
-
-    elif cfg_run['target_classes'] and cfg_run['table_dir'] is None:
-        # show_test_acc(test_accuracy)
-        learn_table(dataloader, network, device)
-        network.save_table()
-        network = prune_network(cfg_run, network)
-        
-
-    test_accuracy = test(dataset, dataloader, network, criterion, device, cfg_run["target_classes"])
     return test_accuracy
 
 
@@ -146,7 +128,7 @@ def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, devic
     return best_network
 
 
-def test(dataset, dataloader, network, criterion, device, target_classes=None):
+def test(dataset, dataloader, network, criterion, device):
     """
     test accuracy 반환, 여기서도 dataset, dataloader는 dictionary type이다.
     """
@@ -155,14 +137,11 @@ def test(dataset, dataloader, network, criterion, device, target_classes=None):
     network.eval()
 
     # Do validation with test dataset
+    running_loss = 0.0
+    running_corrects = 0
 
-    c = 0
     with torch.no_grad():
-        for inputs, labels in tqdm(dataloader['test'], desc="TESTING"):
-            if target_classes:
-                if labels[0] not in target_classes:
-                    continue
-            
+        for inputs, labels in dataloader['test']:
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
@@ -175,46 +154,12 @@ def test(dataset, dataloader, network, criterion, device, target_classes=None):
             prec1 = accuracy(output.data, labels)[0]
             LossMeter.update(loss.item(), inputs.size(0))
             Top1Meter.update(prec1.item(), inputs.size(0))
-            if c< 20:
-                c += 1
-                print(labels[0])
 
     print(f'**[TEST] Loss {LossMeter.val:.4f} ({LossMeter.avg:.4f})\t Acc: {Top1Meter.val:.3f} ({Top1Meter.avg:.3f})\t')
     print()
 
     return Top1Meter.avg
 
-
-def learn_table(dataloader, network, device):
-    """
-    test accuracy 반환, 여기서도 dataset, dataloader는 dictionary type이다.
-    """
-    network.eval()
-    network.learn_table()
-
-    c = 0
-    with torch.no_grad():
-        for inputs, labels in tqdm(dataloader['test'], desc="Learning Table"):
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-            ## COMPUTE
-            output = network(inputs)
-            output = output.float()
-            ###
-            prediction = get_topk_idx(output.data)
-            mask = prediction.eq(labels).float()
-            network.update_table(mask, labels)
-    network.finish_learning_table()
-    return network
-
-
-def prune_network(cfg_run, network):
-    if cfg_run["prune_classes"] is None:
-        prune_classes = cfg_run["target_classes"]
-    prune_classes = cfg_run["prune_classes"]
-    prune_layer = cfg_run["prune_layer"]
-    network.prune(prune_classes, prune_layer)
-    return network
 
 def is_cuda():
     if torch.cuda.is_available():
@@ -224,9 +169,6 @@ def is_cuda():
         print("[ DEVICE  ] No CUDA. Working on CPU.")
         return "cpu"
 
-def get_topk_idx(batch_out, k=1):
-    output = batch_out.reshape(batch_out.shape[0],-1)
-    return torch.topk(output, k, dim=1)[1][:,0]
 
 def get_loss(cfg_run):
     return {
@@ -239,7 +181,7 @@ def get_optimizer(cfg_run, network):
     if name == "adam":
         return optim.Adam(network.parameters(), lr=cfg_run["optimizer"]["lr"])
     if name == "SGD":
-        return optim.SGD(network.parameters(), lr=cfg_run["optimizer"]["lr"],
+        return optim.SGD(model.parameters(), args.lr,
                                 momentum=0.9,
                                 weight_decay=1e-4)
 

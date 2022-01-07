@@ -36,6 +36,10 @@ tensorboard==2.7.0
 tensorboard-data-server==0.6.1
 tensorboard-plugin-wit==1.8.0
 toml==0.10.2
+torch==1.10.1+cu113
+torchaudio==0.10.1+cu113
+torchvision==0.11.2+cu113
+typing_extensions==4.0.1
 urllib3==1.26.7
 Werkzeug==2.0.2
 wrapt==1.13.3

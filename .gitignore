@@ -3,7 +3,9 @@ tensorboards/
 .vscode/
 
 dcp/
+ABCPruner/
 setup.py
+
 
 
 
