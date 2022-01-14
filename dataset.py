@@ -21,7 +21,6 @@ def get_data_set(cfg_data):
                                      std=[0.229, 0.224, 0.225])
 
     aug_config = cfg_data["train"]["augmentation"]
-    resize = cfg_data["resize"]
     train_transforms = [
             transforms.RandomHorizontalFlip(),
             transforms.RandomCrop(32, 4),

@@ -1,35 +1,34 @@
 data:
-  dir: "CIFAR100" # directory path or "CIFAR10" or "CIFAR100"
-  resize: 32 # Resize factor, integer number
+  dir: CIFAR100
   train:
-    augmentation:
-    shuffle: True
+    augmentation: null
+    batch_size: 128
+    n_workers: 8
+    pin_memory: true
+    shuffle: true
+  val:
     batch_size: 128
     n_workers: 4
-    pin_memory: True
-  val:
-    shuffle: False
-    batch_size: 64
-    n_workers: 1
-    pin_memory: True
+    pin_memory: true
+    shuffle: false
   test:
-    shuffle: False
-    batch_size: 1
-    n_workers: 1
-    pin_memory: True
+    batch_size: 128
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
 
 network:
-  backbone: "resnet20"
+  backbone: resnet56
 
 run:
-  load_state:
+  load_state: null
+  
+  epoch: 200
+  figure_interval: 100
+  plot_interval: 10
+  print_interval: 10
+  val_interval: 30
   loss: crossentropy
   optimizer:
-    name: "adam"
-    lr: 5.0e-4
-    
-  epoch: 2
-  val_interval: 1
-  print_interval: 1
-  plot_interval: 1
-  figure_interval: 1
+    lr: 1.0e-4
+    name: adam
