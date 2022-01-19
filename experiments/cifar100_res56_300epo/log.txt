@@ -1,0 +1,97 @@
+[ DATADIR ]  CIFAR100
+Files already downloaded and verified
+Files already downloaded and verified
+Files already downloaded and verified
+[ DATASET ] [train] number of classes:100, size:50000 [val] number of classes:100, size:10000 [test] number of classes:100, size:10000
+[ NETWORK ] [backbone] resnet56 [prune] True [k_st_topk2table] 0.5 [pruning_rate] 0.9 [logdir] tensorboards/0107_124308_test
+[MODEL] Number of parameters :  858868
+[ DEVICE  ] CUDA available
+[LOSS FUNC] CrossEntropyLoss()  [OPTIMIZER] Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    eps: 1e-08
+    lr: 0.0001
+    weight_decay: 0
+)
+
+====================== TRAINING START! =====================
+[Epoch 10/300] [TRAIN] Loss 3.3623 (3.1317)	 Acc: 25.000 (23.790)	 Time 0.146 (0.223)
+[Epoch 20/300] [TRAIN] Loss 2.5725 (2.5409)	 Acc: 37.500 (35.082)	 Time 0.143 (0.222)
+[Epoch 30/300] [TRAIN] Loss 2.0258 (2.1568)	 Acc: 47.500 (43.376)	 Time 0.142 (0.224)
+**[Epoch 30/300] [VAL] Loss 2.2734 (2.3443)	 Acc: 43.750 (39.720)	 TotalTime: 1h 43min
+
+[Epoch 40/300] [TRAIN] Loss 1.8584 (1.8944)	 Acc: 52.500 (49.096)	 Time 0.141 (0.222)
+[Epoch 50/300] [TRAIN] Loss 2.1182 (1.6881)	 Acc: 43.750 (53.698)	 Time 0.156 (0.548)
+[Epoch 60/300] [TRAIN] Loss 1.7895 (1.5314)	 Acc: 52.500 (57.640)	 Time 0.169 (0.558)
+**[Epoch 60/300] [VAL] Loss 1.8749 (1.9813)	 Acc: 62.500 (48.920)	 TotalTime: 2h 1min
+
+[Epoch 70/300] [TRAIN] Loss 1.4521 (1.3954)	 Acc: 56.250 (60.516)	 Time 0.215 (0.281)
+[Epoch 80/300] [TRAIN] Loss 1.3816 (1.2764)	 Acc: 61.250 (63.610)	 Time 0.274 (0.286)
+[Epoch 90/300] [TRAIN] Loss 1.5541 (1.1722)	 Acc: 62.500 (66.036)	 Time 0.291 (0.275)
+**[Epoch 90/300] [VAL] Loss 1.7397 (1.9207)	 Acc: 62.500 (52.050)	 TotalTime: 3h 9min
+
+[Epoch 100/300] [TRAIN] Loss 1.0421 (1.0796)	 Acc: 68.750 (68.686)	 Time 0.283 (0.284)
+[Epoch 110/300] [TRAIN] Loss 1.1432 (0.9910)	 Acc: 71.250 (71.076)	 Time 0.288 (0.277)
+[Epoch 120/300] [TRAIN] Loss 0.8067 (0.9198)	 Acc: 72.500 (72.684)	 Time 0.147 (0.283)
+**[Epoch 120/300] [VAL] Loss 1.6733 (1.9727)	 Acc: 56.250 (53.430)	 TotalTime: 4h 5min
+
+[Epoch 130/300] [TRAIN] Loss 0.9771 (0.8469)	 Acc: 67.500 (74.820)	 Time 0.496 (0.279)
+[Epoch 140/300] [TRAIN] Loss 0.8420 (0.7846)	 Acc: 73.750 (76.408)	 Time 0.181 (0.283)
+[Epoch 150/300] [TRAIN] Loss 0.8143 (0.7230)	 Acc: 76.250 (78.066)	 Time 0.433 (0.281)
+**[Epoch 150/300] [VAL] Loss 2.2423 (2.1182)	 Acc: 50.000 (53.610)	 TotalTime: 5h 60min
+
+[Epoch 160/300] [TRAIN] Loss 0.6136 (0.6749)	 Acc: 77.500 (79.348)	 Time 0.163 (0.280)
+[Epoch 170/300] [TRAIN] Loss 0.9019 (0.6250)	 Acc: 71.250 (80.670)	 Time 0.291 (0.284)
+[Epoch 180/300] [TRAIN] Loss 0.6490 (0.5874)	 Acc: 77.500 (81.690)	 Time 0.146 (0.282)
+**[Epoch 180/300] [VAL] Loss 2.1552 (2.1893)	 Acc: 56.250 (54.480)	 TotalTime: 6h 55min
+
+[Epoch 190/300] [TRAIN] Loss 0.5401 (0.5468)	 Acc: 78.750 (82.900)	 Time 0.290 (0.284)
+[Epoch 200/300] [TRAIN] Loss 0.5709 (0.5138)	 Acc: 83.750 (84.018)	 Time 0.142 (0.290)
+[Epoch 210/300] [TRAIN] Loss 0.4146 (0.4793)	 Acc: 86.250 (84.880)	 Time 0.362 (0.352)
+**[Epoch 210/300] [VAL] Loss 2.6291 (2.3655)	 Acc: 62.500 (54.290)	 TotalTime: 7h 56min
+
+[Epoch 220/300] [TRAIN] Loss 0.4058 (0.4444)	 Acc: 88.750 (85.948)	 Time 0.174 (0.343)
+[Epoch 230/300] [TRAIN] Loss 0.5088 (0.4156)	 Acc: 83.750 (86.934)	 Time 0.163 (0.319)
+[Epoch 240/300] [TRAIN] Loss 0.4240 (0.3894)	 Acc: 83.750 (87.634)	 Time 0.142 (0.335)
+**[Epoch 240/300] [VAL] Loss 2.5248 (2.5001)	 Acc: 56.250 (54.410)	 TotalTime: 8h 3min
+
+[Epoch 250/300] [TRAIN] Loss 0.4375 (0.3692)	 Acc: 88.750 (88.072)	 Time 0.353 (0.328)
+[Epoch 260/300] [TRAIN] Loss 0.4824 (0.3517)	 Acc: 83.750 (88.632)	 Time 0.230 (0.338)
+[Epoch 270/300] [TRAIN] Loss 0.4698 (0.3298)	 Acc: 85.000 (89.384)	 Time 0.134 (0.331)
+**[Epoch 270/300] [VAL] Loss 3.6794 (2.6840)	 Acc: 50.000 (54.350)	 TotalTime: 9h 10min
+
+[Epoch 280/300] [TRAIN] Loss 0.4783 (0.3179)	 Acc: 83.750 (89.732)	 Time 0.167 (0.338)
+[Epoch 290/300] [TRAIN] Loss 0.4855 (0.2923)	 Acc: 85.000 (90.630)	 Time 0.229 (0.312)
+[Epoch 300/300] [TRAIN] Loss 0.3058 (0.2804)	 Acc: 85.000 (90.854)	 Time 0.156 (0.344)
+**[Epoch 300/300] [VAL] Loss 3.3984 (2.7942)	 Acc: 56.250 (55.280)	 TotalTime: 10h 18min
+
+tensor(49, device='cuda:0')
+tensor(33, device='cuda:0')
+tensor(72, device='cuda:0')
+tensor(51, device='cuda:0')
+tensor(71, device='cuda:0')
+tensor(92, device='cuda:0')
+tensor(15, device='cuda:0')
+tensor(14, device='cuda:0')
+tensor(23, device='cuda:0')
+tensor(0, device='cuda:0')
+tensor(71, device='cuda:0')
+tensor(75, device='cuda:0')
+tensor(81, device='cuda:0')
+tensor(69, device='cuda:0')
+tensor(40, device='cuda:0')
+tensor(43, device='cuda:0')
+tensor(92, device='cuda:0')
+tensor(97, device='cuda:0')
+tensor(70, device='cuda:0')
+tensor(53, device='cuda:0')
+**[TEST] Loss 0.0005 (2.7942)	 Acc: 100.000 (55.280)	
+
+
+==========================================================
+#                                                          #
+#                  Test acc : 55.2800                  #
+#                                                          #
+==========================================================
+

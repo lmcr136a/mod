@@ -1,0 +1,38 @@
+[ DATADIR ]  CIFAR100
+Files already downloaded and verified
+Files already downloaded and verified
+Files already downloaded and verified
+[ DATASET ] [train] number of classes:100, size:50000 [val] number of classes:100, size:10000 [test] number of classes:100, size:10000
+[ NETWORK ] [backbone] resnet20 [prune] True [k_st_topk2table] 0.5 [pruning_rate] 0.9 [logdir] tensorboards/1229_110228_test
+[MODEL] Number of parameters :  275572
+[ DEVICE  ] CUDA available
+[LOSS FUNC] CrossEntropyLoss()  [OPTIMIZER] Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    eps: 1e-08
+    lr: 0.0005
+    weight_decay: 0
+)
+
+====================== LOADING STATES...
+
+============================== COMPLETE!
+output_filter_num / filter_num :   14  /  16
+output_filter_num / filter_num :   14  /  16
+output_filter_num / filter_num :   14  /  16
+output_filter_num / filter_num :   29  /  32
+output_filter_num / filter_num :   29  /  32
+output_filter_num / filter_num :   29  /  32
+output_filter_num / filter_num :   58  /  64
+output_filter_num / filter_num :   58  /  64
+output_filter_num / filter_num :   58  /  64
+**[TEST] Loss 3.8356 (6.3301)	 Acc: 0.000 (17.380)	
+
+
+==========================================================
+#                                                          #
+#                  Test acc : 17.3800                  #
+#                                                          #
+==========================================================
+

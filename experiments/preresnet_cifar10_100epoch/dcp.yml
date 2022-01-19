@@ -1,0 +1,54 @@
+data:
+  dir: CIFAR10
+  resize: 32
+  test:
+    batch_size: 64
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+  train:
+    augmentation: null
+    batch_size: 128
+    n_workers: 4
+    pin_memory: true
+    shuffle: true
+  val:
+    batch_size: 64
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+network:
+  backbone: preresnet
+  depth: 56
+  k_st_topk2table: 0.5
+  logdir: tensorboards/0104_130231_dcp
+  n_classes: 10
+  prune: null
+  pruning_rate: 0.9
+run:
+  dcp:
+    depth: 56
+    gpu: 0
+    layer_wise_lr: 0.01
+    lr: 0.1
+    momentum: 0.9
+    mse_weight: 1.0
+    n_classes: 10
+    n_losses: 3
+    pruning_rate: 0.5
+    softmax_weight: 1.0
+    warmstart: true
+    weight_decay: 1e-4
+  epoch: 100
+  figure_interval: 50
+  load_state: null
+  loss: crossentropy
+  optimizer:
+    lr: 0.0005
+    name: adam
+  plot_interval: 1
+  print_interval: 10
+  prune_classes: null
+  table_dir: null
+  target_classes: null
+  val_interval: 20

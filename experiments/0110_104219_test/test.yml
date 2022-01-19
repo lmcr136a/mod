@@ -1,0 +1,31 @@
+data:
+  dir: CIFAR100
+  test:
+    batch_size: 128
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+  train:
+    augmentation: null
+    batch_size: 128
+    n_workers: 8
+    pin_memory: true
+    shuffle: true
+  val:
+    batch_size: 128
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+network:
+  backbone: resnet56
+run:
+  epoch: 200
+  figure_interval: 100
+  load_state: null
+  loss: crossentropy
+  optimizer:
+    lr: 0.0001
+    name: adam
+  plot_interval: 10
+  print_interval: 10
+  val_interval: 30

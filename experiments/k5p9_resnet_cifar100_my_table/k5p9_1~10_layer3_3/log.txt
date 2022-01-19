@@ -1,0 +1,50 @@
+[ DATADIR ]  CIFAR100
+Files already downloaded and verified
+Files already downloaded and verified
+Files already downloaded and verified
+[ DATASET ] [train] number of classes:100, size:50000 [val] number of classes:100, size:10000 [test] number of classes:100, size:10000
+[ NETWORK ] [backbone] resnet20 [prune] True [k_st_topk2table] 0.5 [pruning_rate] 0.9 [logdir] tensorboards/1229_153809_test
+[MODEL] Number of parameters :  275572
+[ DEVICE  ] CUDA available
+[LOSS FUNC] CrossEntropyLoss()  [OPTIMIZER] Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    eps: 1e-08
+    lr: 0.0005
+    weight_decay: 0
+)
+
+====================== LOADING STATES...
+
+============================== COMPLETE!
+layer3_2output_filter_num / filter_num :   58  /  64
+tensor(0, device='cuda:0')
+tensor(8, device='cuda:0')
+tensor(8, device='cuda:0')
+tensor(4, device='cuda:0')
+tensor(6, device='cuda:0')
+tensor(9, device='cuda:0')
+tensor(2, device='cuda:0')
+tensor(7, device='cuda:0')
+tensor(6, device='cuda:0')
+tensor(0, device='cuda:0')
+tensor(9, device='cuda:0')
+tensor(8, device='cuda:0')
+tensor(1, device='cuda:0')
+tensor(4, device='cuda:0')
+tensor(4, device='cuda:0')
+tensor(8, device='cuda:0')
+tensor(9, device='cuda:0')
+tensor(4, device='cuda:0')
+tensor(7, device='cuda:0')
+tensor(6, device='cuda:0')
+**[TEST] Loss 1.1208 (2.2576)	 Acc: 0.000 (47.100)	
+
+
+==========================================================
+#                                                          #
+#                  Test acc : 47.1000                  #
+#                                                          #
+==========================================================
+
