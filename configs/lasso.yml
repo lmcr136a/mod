@@ -26,10 +26,10 @@ run:
   load_state: experiments/cifar100_res20_100epo/best_model.pt
   pruning: random
   lasso:
-    all_classes: False  # 기본 lasso compress, saved_index 관련 없음
+    all_classes: True  # 기본 lasso compress, saved_index 관련 없음
     k: 0.49
     # batch: 512
-    saved_index: experiments/lasso_one_batch/total_indices_stayed.pt
+    saved_index: #experiments/lasso_one_batch/total_indices_stayed.pt
   
   seed: 9099
   gpu_device: 1

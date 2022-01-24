@@ -27,11 +27,11 @@ network:
 run:
   epoch: 30
   figure_interval: 10
-  gpu_device: 2
+  gpu_device: 1
   lasso:
     all_classes: true
     k: 0.49
-    saved_index: experiments/lasso_one_batch/total_indices_stayed.pt
+    saved_index: null
   load_state: experiments/cifar100_res20_100epo/best_model.pt
   loss: crossentropy
   optimizer:
@@ -46,5 +46,6 @@ run:
     weight_decay: 0.0005
   plot_interval: 10
   print_interval: 10
+  pruning: random
   seed: 9099
   val_interval: 10
