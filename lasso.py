@@ -36,20 +36,17 @@ class BaseAgent:
 
 
 class AssembleNetResNet(BaseAgent):
-    def __init__(self, config):
+    def __init__(self, config, dataloader, best_network, optimizer, criterion, n_class):
         super().__init__(config)
 
         # set device
         self.is_cuda = torch.cuda.is_available()
-        if self.is_cuda and not self.config.cuda:
-            self.logger.info("WARNING: You have a CUDA device, so you should probably enable CUDA")
-
-        self.cuda = self.is_cuda & self.config.cuda
-        self.manual_seed = self.config.seed
+        self.cuda = self.is_cuda
+        self.manual_seed = self.config.get("seed", 9099)
         if self.cuda:
             self.device = torch.device("cuda")
             torch.cuda.manual_seed(self.manual_seed)
-            torch.cuda.set_device(self.config.gpu_device)
+            torch.cuda.set_device(self.config.get("gpu_device", 0))
 
             self.logger.info("Program will run on *****GPU-CUDA*****\n")
             print_cuda_statistics()
@@ -58,14 +55,17 @@ class AssembleNetResNet(BaseAgent):
             torch.manual_seed(self.manual_seed)
             self.logger.info("Program will run on *****CPU*****\n")
 
-        self.num_classes = self.config.num_classes
+        self.num_classes = n_class
 
-        self.model = None   # original model graph, loss function, optimizer, learning scheduler
-        self.loss_fn = None
-        self.optimizer = None
-        self.scheduler = None
+        self.model = best_network   # original model graph, loss function, optimizer, learning scheduler
+        self.loss_fn = criterion
+        self.optimizer = optimizer
+        self.model = self.model.to(self.device)
+        self.loss_fn = self.loss_fn.to(self.device)
+        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.config["optimizer"].get("milestones", 10),
+                                                        gamma=self.config.get("gamma", 0.9))
 
-        self.data_loader = Cifar100DataLoader(config=self.config)   # data loader
+        self.data_loader = dataloader
         self.sub_data_loader = None                                 # sub data loader for sub task
 
         self.current_epoch = 0      # info for train
@@ -87,15 +87,6 @@ class AssembleNetResNet(BaseAgent):
         self.init_graph()
 
     def init_graph(self, pretrained=True, init_channel_importance=True):     # 모델 그래프와 정보를 초기화
-        self.model = resnet20()
-        self.loss_fn = nn.CrossEntropyLoss()
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.1, momentum=0.9, weight_decay=0.0005,
-                                         nesterov=True)
-        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.config.milestones,
-                                                        gamma=self.config.gamma)
-
-        self.model = self.model.to(self.device)
-        self.loss_fn = self.loss_fn.to(self.device)
 
         self.current_epoch = 0
         self.current_iteration = 0
@@ -145,21 +136,7 @@ class AssembleNetResNet(BaseAgent):
 
     def set_subtask(self, *cls_i):
         self.cls_i = cls_i
-        self.sub_data_loader = SpecializedImagenetDataLoader(self.config, *self.cls_i)
-
-    def load_checkpoint(self, file_path="checkpoint.pth", only_weight=False):
-        """
-        Latest checkpoint loader
-        :param file_path: str, path of the checkpoint file
-        :param only_weight: bool, load only weight or all training state
-        :return:
-        """
-        print("Loading checkpoint '{}'".format(file_path))
-        checkpoint = torch.load(file_path)
-        self.model.load_state_dict(checkpoint)
-        print("Checkpoint loaded successfully\n")
-
-
+        # self.sub_data_loader = SpecializedImagenetDataLoader(self.config, *self.cls_i)
     def save_checkpoint(self, file_name="checkpoint.pth", is_best=False):
         pass
 
@@ -175,7 +152,7 @@ class AssembleNetResNet(BaseAgent):
         outputs, grads = {}, {}
         for inputs, labels in self.data_loader.train_loader:
             if self.cuda:
-                inputs = inputs.cuda(non_blocking=self.config.async_loading)
+                inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
                 inputs.requires_grad = True
 
             x = inputs
@@ -241,14 +218,25 @@ class AssembleNetResNet(BaseAgent):
 
     def record_conv_output(self, inputs):
         if self.cuda:
-            inputs = inputs.cuda(non_blocking=self.config.async_loading)
+            inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
         x = inputs
         for i, m in enumerate(self.all_list):
             if isinstance(m, torch.nn.Conv2d):
                 x = m(x)
                 self.original_conv_output['{}'.format(i)] = x
-                continue
-            if isinstance(m, models.resnet_imagenet.Bottleneck):
+            elif isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+                shortcut = x
+                # first conv in residual block
+                x = m.conv1(x)
+                self.original_conv_output['{}.conv1'.format(i)] = x
+                x = torch.relu(m.bn1(x))
+                # second conv in residual block
+                x = m.conv2(x)
+                self.original_conv_output['{}.conv2'.format(i)] = x
+                x = torch.relu(m.bn2(x) + m.shortcut(shortcut))
+                assert torch.all(x == m(shortcut))
+
+            elif isinstance(m, models.resnet_imagenet.Bottleneck):
                 shortcut = x
                 # first conv in residual block
                 x = m.conv1(x)
@@ -282,7 +270,7 @@ class AssembleNetResNet(BaseAgent):
         pass
 
     @timeit
-    def compress(self, method='gradient', k=0.5):
+    def compress(self, log_dir, method='gradient', k=0.5):
         if method == "first_k":
             for i, m in enumerate(self.all_list):
                 if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
@@ -297,11 +285,10 @@ class AssembleNetResNet(BaseAgent):
         print(self.data_loader.train_loader)
         inputs, _ = next(iter(self.data_loader.train_loader))
         if self.cuda:
-            inputs = inputs.cuda(non_blocking=self.config.async_loading)
+            inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
         self.record_conv_output(inputs)
         inputs.cpu()
         start = time.time()
-        
         
         if method == 'manual':  # 미리 저장된 레이어당 채널 번호로 프루닝
             x = inputs
@@ -384,16 +371,21 @@ class AssembleNetResNet(BaseAgent):
                     break
                 x = m(x)
 
-        elif method == 'lasso':
+        elif method == 'lasso': ###################################################################
             x = inputs
+            print("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
+            total_indices_stayed = [[] for i in range(len(self.all_list))]
             for i, m in enumerate(self.all_list):
                 print(m)
                 if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
-                    conv1 = self.named_modules_list[str(i) + '.conv1']
-                    bn1 = self.named_modules_list[str(i) + '.bn1']
-                    conv2 = self.named_modules_list[str(i) + '.conv2']
+                    conv1 = self.named_modules_list[str(i)].conv1
+                    bn1 = self.named_modules_list[str(i)].bn1
+                    conv2 = self.named_modules_list[str(i)].conv2
                     input_feature = torch.relu(bn1(conv1(x)))
+                    
                     indices_stayed, indices_pruned = channel_selection(input_feature, conv2, sparsity=(1.-k), method='lasso')
+                    total_indices_stayed[i].append(indices_stayed)
+                    
                     module_surgery(conv1, bn1, conv2, indices_stayed)
                     pruned_input_feature = torch.relu(bn1(conv1(x)))
                     output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
@@ -401,9 +393,104 @@ class AssembleNetResNet(BaseAgent):
                 elif isinstance(m, torch.nn.Linear):
                     break
                 x = m(x)
+            torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
+            print(total_indices_stayed)
+        self.original_conv_output = dict()  # clear original output to save cuda memory
+
+
+    def lasso_compress(self, l_cfg, log_dir):
+        k = l_cfg.get("k", 0.49)
+        saved_index = l_cfg.get("saved_index", None)
+        batch = l_cfg.get("batch", None)
+        print('\n\n\nTHIS IS LASSO COMPRESS!!!!!!!!!!!!!!!!\n\n\n')
+
+        if batch:
+            concated_input = torch.Tensor([])
+            for inputs, label in (self.data_loader.train_loader):
+                concated_input = torch.cat((concated_input, inputs), 0)
+            if self.cuda:
+                concated_input = concated_input.cuda(non_blocking=self.config.get("async_loading", True))
+            concated_input = torch.split(concated_input, batch, dim=0)
+            print(len(concated_input))
+            loader = zip(concated_input, [0]*len(concated_input))
+        else:        
+            loader = self.data_loader.train_loader
+        
+
+        if not saved_index:
+            total_indices_stayed = [[] for i in range(len(self.all_list))]
+            for inputs, label in loader:
+                if self.cuda:
+                    inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
+                x = inputs
+                print("nnnnnnmnmnmnmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmnmnmnmnnnnnn")
+                for i, m in enumerate(self.all_list):
+                    if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+                        conv1 = self.named_modules_list[str(i)].conv1
+                        bn1 = self.named_modules_list[str(i)].bn1
+                        conv2 = self.named_modules_list[str(i)].conv2
+                        input_feature = torch.relu(bn1(conv1(x)))
+                        
+                        indices_stayed, indices_pruned = channel_selection(input_feature, conv2, sparsity=(1.-k), method='lasso')
+                        total_indices_stayed[i].append(indices_stayed)
+                    elif isinstance(m, torch.nn.Linear):
+                        break
+                    x = m(x)
+                # break  ##########################
+            torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
+
+        else:
+            print("LOADING SAVED INEDX...mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmnmnmnmnnnnnn")
+            total_indices_stayed = torch.load(saved_index)
+
+        total_indices_stayed = self.get_total_top_indices(total_indices_stayed)
+        print(total_indices_stayed)
+
+
+        inputs, _ = next(iter(self.data_loader.train_loader))
+        if self.cuda:
+            inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
+        self.record_conv_output(inputs)
+        x = inputs
+        for i, m in enumerate(self.all_list):
+            if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+                conv1 = self.named_modules_list[str(i)].conv1
+                bn1 = self.named_modules_list[str(i)].bn1
+                conv2 = self.named_modules_list[str(i)].conv2
+                input_feature = torch.relu(bn1(conv1(x)))
+                
+                indices_stayed = total_indices_stayed[i]
+                
+                module_surgery(conv1, bn1, conv2, indices_stayed)
+                pruned_input_feature = torch.relu(bn1(conv1(x)))
+                output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
+                weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
+            elif isinstance(m, torch.nn.Linear):
+                break
+            x = m(x)
         self.original_conv_output = dict()  # clear original output to save cuda memory
     
-    
+
+
+    def get_total_top_indices(self, total_indices_stayed, k=None):
+        output = []
+        for a_layer_indices in total_indices_stayed:
+            if len(a_layer_indices)==0:
+                output.append([])
+            else:
+                output.append(self.get_top_indices(torch.Tensor(a_layer_indices)).tolist())
+        return output
+
+
+    def get_top_indices(self, tensor, k=None):
+        ont_hot = F.one_hot(tensor.flatten().long())
+        count = torch.sum(ont_hot, axis=0)
+        if k:
+            _, ind = torch.topk(count, k)
+        else:
+            _, ind = torch.topk(count, len(tensor[0]))
+        return ind
+
     def adjust_learning_rate(self,optimizer, epoch, iteration, num_iter):
         warmup_epoch = 5
         warmup_iter = warmup_epoch * num_iter
@@ -432,12 +519,12 @@ class AssembleNetResNet(BaseAgent):
 
         self.optimizer = torch.optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005,
                                          nesterov=True)
-        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.config.milestones,
-                                                        gamma=self.config.gamma)
+        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=self.config["optimizer"].get("milestones", 10),
+                                                        gamma=self.config.get("gamma", 0.9))
         self.model.to(self.device)
 
         history = []
-        for epoch in range(self.current_epoch, self.config.max_epoch):
+        for epoch in range(self.get("current_epoch", 0), self.config["epoch"]):
             self.current_epoch = epoch
             self.train_one_epoch(specializing)
 
@@ -478,12 +565,13 @@ class AssembleNetResNet(BaseAgent):
         current_batch = 0
         for i,(x, y) in enumerate(tqdm_batch):
             if self.cuda:
-                x, y = x.cuda(non_blocking=self.config.async_loading), y.cuda(non_blocking=self.config.async_loading)
+                x, y = x.cuda(non_blocking=self.config.get("async_loading", True)), y.cuda(non_blocking=self.config.get("async_loading", True))
 
             self.optimizer.zero_grad()
             self.adjust_learning_rate(self.optimizer, self.current_epoch, i, self.data_loader.train_iterations)
 
             pred = self.model(x)
+            y = y.to(torch.long)
             cur_loss = self.loss_fn(pred, y)
 
             if np.isnan(float(cur_loss.item())):
@@ -531,11 +619,12 @@ class AssembleNetResNet(BaseAgent):
 
         for x, y in tqdm_batch:
             if self.cuda:
-                x, y = x.cuda(non_blocking=self.config.async_loading), y.cuda(non_blocking=self.config.async_loading)
+                x, y = x.cuda(non_blocking=self.config.get("async_loading", True)), y.cuda(non_blocking=self.config.get("async_loading", True))
 
             # model
             pred = self.model(x)
             # loss
+            y = y.to(torch.long)
             cur_loss = self.loss_fn(pred, y)
             if np.isnan(float(cur_loss.item())):
                 raise ValueError('Loss is nan during validation...')
@@ -580,7 +669,7 @@ if __name__=="__main__":
 
     config.load_file = 'experiments/cifar100_res20_100epo/best_model.pt'
     config.cuda = True
-    config.gpu_device = 0
+    config.gpu_device = 2
     config.seed = 1
     config.learning_rate = 0.001
     config.momentum = 0.9
@@ -595,7 +684,7 @@ if __name__=="__main__":
     config.async_loading = True
     config.batch_size = 128
     config.async_loading = True
-    config.max_epoch = 100
+    config.max_epoch = 30
     torch.cuda.init()
 
 
@@ -606,7 +695,8 @@ if __name__=="__main__":
     # agent.validate()
 
 
-    agent.compress(method = 'greedy',k=0.49)
+    agent.lasso_compress(k=0.49)
+    # agent.compress("lasso", k=0.49)
     summary(agent.model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
 
     best,history = agent.train(specializing=False, freeze_conv=False)

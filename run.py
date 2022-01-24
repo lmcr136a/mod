@@ -3,12 +3,16 @@ import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from metrics import AverageMeter, accuracy
+import torch.nn.utils.prune as prune
+
+from utils.metrics import AverageMeter, accuracy
 from figure import plot_classes_preds
+from torchsummaryX import summary
+from lasso import AssembleNetResNet
+from utils.utils import show_test_acc
 
 
-
-def run(dataset, dataloader, network, cfg_run, writer):
+def run(dataloader, network, cfg_run, writer, n_class):
     """
     한방에 train/val을 진행, validation accuracy가 가장 높은 파라미터를 가지고
     test 진행. test accuracy 를 포함한 학습과정 전체를 가지고 있는 정보를 반환.
@@ -28,17 +32,35 @@ def run(dataset, dataloader, network, cfg_run, writer):
 
     if cfg_run["load_state"]:
         print("\n====================== LOADING STATES... =====================")
-        best_network = network.load_state_dict(torch.load(cfg_run["load_state"]))
+        network.load_state_dict(torch.load(cfg_run["load_state"]))
     else:
         print("\n====================== TRAINING START! =====================")
-        best_network = trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, device, writer)
-        torch.save(best_network.state_dict(), writer.log_dir+"/best_model.pt")
-    test_accuracy = test(dataset, dataloader, best_network, criterion, device)
+        network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)
+        torch.save(network.state_dict(), writer.log_dir+"/best_model.pt")
+
+
+    if cfg_run.get("lasso", None):
+        show_test_acc(test(dataloader, network, criterion, device))
+
+        agent = AssembleNetResNet(cfg_run, dataloader, network, optimizer, criterion, n_class)
+        agent.init_graph(pretrained=False)
+        summary(agent.model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
+        if cfg_run["lasso"]["all_classes"]:
+            agent.compress(writer.log_dir, method="lasso", k=cfg_run["lasso"].get("k", 0.49))
+        else:
+            agent.lasso_compress(cfg_run["lasso"], writer.log_dir)
+            
+        summary(agent.model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
+        show_test_acc(test(dataloader, network, criterion, device))
+
+
+    network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)
+    test_accuracy = test(dataloader, network, criterion, device)
     
     return test_accuracy
 
 
-def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, device, writer):
+def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer):
     """
     cfg_run에 담긴대로 training/validation 진행
     가장 높은 validation accuracy를 가진 네트워크를 출력
@@ -57,11 +79,12 @@ def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, devic
 
         network.train()
 
-        for inputs, labels in dataloader['train']:
+        for inputs, labels in dataloader.train_loader:
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
             output = network(inputs)
+            labels = labels.to(torch.long)
             loss = criterion(output, labels)
 
             optimizer.zero_grad()
@@ -97,11 +120,12 @@ def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, devic
             end = time.time()
             network.eval()
             with torch.no_grad():
-                for inputs, labels in dataloader['val']:
+                for inputs, labels in dataloader.valid_loader:
                     inputs = inputs.to(device)
                     labels = labels.to(device)
                     ## COMPUTE
                     output = network(inputs)
+                    labels = labels.to(torch.long)
                     loss = criterion(output, labels)
 
                     output = output.float()
@@ -128,7 +152,7 @@ def trainNval(dataset, dataloader, network, cfg_run, criterion, optimizer, devic
     return best_network
 
 
-def test(dataset, dataloader, network, criterion, device):
+def test(dataloader, network, criterion, device):
     """
     test accuracy 반환, 여기서도 dataset, dataloader는 dictionary type이다.
     """
@@ -141,11 +165,12 @@ def test(dataset, dataloader, network, criterion, device):
     running_corrects = 0
 
     with torch.no_grad():
-        for inputs, labels in dataloader['test']:
+        for inputs, labels in dataloader.test_loader:
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
             output = network(inputs)
+            labels = labels.to(torch.long)
             loss = criterion(output, labels)
 
             output = output.float()

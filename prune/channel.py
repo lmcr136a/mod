@@ -74,7 +74,7 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
 
         indices_pruned = list(set([i for i in range(num_channel)]) - set(indices_stayed))
 
-    elif method == 'lasso':
+    elif method == 'lasso': 
         y = module(inputs)
 
         if module.bias is not None:  # bias.shape = [N]

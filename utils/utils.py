@@ -12,7 +12,7 @@ def configuration(config):
     output: dictionary of configurations
     """
     print("\n\n\n                               START LOGGING\n\n")
-    tb_dir = f'tensorboards/{time.strftime("%m%d_%H%M%S", time.localtime())}_{config.split("/")[1].split(".")[0]}'
+    tb_dir = f'experiments/{time.strftime("%m%d_%H%M%S", time.localtime())}_{config.split("/")[1].split(".")[0]}'
     writer = SummaryWriter(tb_dir)
     f = open(tb_dir+"/log.txt", 'w')
     sys.stdout = f

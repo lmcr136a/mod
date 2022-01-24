@@ -1,0 +1,337 @@
+Files already downloaded and verified
+Files already downloaded and verified
+[ NETWORK ] [backbone] resnet20
+[MODEL] Number of parameters :  275572
+[ DEVICE  ] CUDA available
+[LOSS FUNC] CrossEntropyLoss()  [OPTIMIZER] Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    eps: 1e-08
+    lr: 0.0001
+    weight_decay: 0
+)
+
+====================== LOADING STATES... =====================
+**[TEST] Loss 1.4959 (1.6668)	 Acc: 56.034 (54.600)	
+
+
+==========================================================
+#                                                          #
+#                  Test acc : 54.6000                  #
+#                                                          #
+==========================================================
+
+=====================================================================================
+                                    Kernel Shape     Output Shape   Params  \
+Layer                                                                        
+0_conv1                            [3, 16, 3, 3]  [1, 16, 32, 32]    432.0   
+1_bn1                                       [16]  [1, 16, 32, 32]     32.0   
+2_layer1.0.Conv2d_conv1           [16, 16, 3, 3]  [1, 16, 32, 32]   2.304k   
+3_layer1.0.BatchNorm2d_bn1                  [16]  [1, 16, 32, 32]     32.0   
+4_layer1.0.Conv2d_conv2           [16, 16, 3, 3]  [1, 16, 32, 32]   2.304k   
+5_layer1.0.BatchNorm2d_bn2                  [16]  [1, 16, 32, 32]     32.0   
+6_layer1.0.Sequential_shortcut                 -  [1, 16, 32, 32]        -   
+7_layer1.1.Conv2d_conv1           [16, 16, 3, 3]  [1, 16, 32, 32]   2.304k   
+8_layer1.1.BatchNorm2d_bn1                  [16]  [1, 16, 32, 32]     32.0   
+9_layer1.1.Conv2d_conv2           [16, 16, 3, 3]  [1, 16, 32, 32]   2.304k   
+10_layer1.1.BatchNorm2d_bn2                 [16]  [1, 16, 32, 32]     32.0   
+11_layer1.1.Sequential_shortcut                -  [1, 16, 32, 32]        -   
+12_layer1.2.Conv2d_conv1          [16, 16, 3, 3]  [1, 16, 32, 32]   2.304k   
+13_layer1.2.BatchNorm2d_bn1                 [16]  [1, 16, 32, 32]     32.0   
+14_layer1.2.Conv2d_conv2          [16, 16, 3, 3]  [1, 16, 32, 32]   2.304k   
+15_layer1.2.BatchNorm2d_bn2                 [16]  [1, 16, 32, 32]     32.0   
+16_layer1.2.Sequential_shortcut                -  [1, 16, 32, 32]        -   
+17_layer2.0.Conv2d_conv1          [16, 32, 3, 3]  [1, 32, 16, 16]   4.608k   
+18_layer2.0.BatchNorm2d_bn1                 [32]  [1, 32, 16, 16]     64.0   
+19_layer2.0.Conv2d_conv2          [32, 32, 3, 3]  [1, 32, 16, 16]   9.216k   
+20_layer2.0.BatchNorm2d_bn2                 [32]  [1, 32, 16, 16]     64.0   
+21_layer2.0.LambdaLayer_shortcut               -  [1, 32, 16, 16]        -   
+22_layer2.1.Conv2d_conv1          [32, 32, 3, 3]  [1, 32, 16, 16]   9.216k   
+23_layer2.1.BatchNorm2d_bn1                 [32]  [1, 32, 16, 16]     64.0   
+24_layer2.1.Conv2d_conv2          [32, 32, 3, 3]  [1, 32, 16, 16]   9.216k   
+25_layer2.1.BatchNorm2d_bn2                 [32]  [1, 32, 16, 16]     64.0   
+26_layer2.1.Sequential_shortcut                -  [1, 32, 16, 16]        -   
+27_layer2.2.Conv2d_conv1          [32, 32, 3, 3]  [1, 32, 16, 16]   9.216k   
+28_layer2.2.BatchNorm2d_bn1                 [32]  [1, 32, 16, 16]     64.0   
+29_layer2.2.Conv2d_conv2          [32, 32, 3, 3]  [1, 32, 16, 16]   9.216k   
+30_layer2.2.BatchNorm2d_bn2                 [32]  [1, 32, 16, 16]     64.0   
+31_layer2.2.Sequential_shortcut                -  [1, 32, 16, 16]        -   
+32_layer3.0.Conv2d_conv1          [32, 64, 3, 3]    [1, 64, 8, 8]  18.432k   
+33_layer3.0.BatchNorm2d_bn1                 [64]    [1, 64, 8, 8]    128.0   
+34_layer3.0.Conv2d_conv2          [64, 64, 3, 3]    [1, 64, 8, 8]  36.864k   
+35_layer3.0.BatchNorm2d_bn2                 [64]    [1, 64, 8, 8]    128.0   
+36_layer3.0.LambdaLayer_shortcut               -    [1, 64, 8, 8]        -   
+37_layer3.1.Conv2d_conv1          [64, 64, 3, 3]    [1, 64, 8, 8]  36.864k   
+38_layer3.1.BatchNorm2d_bn1                 [64]    [1, 64, 8, 8]    128.0   
+39_layer3.1.Conv2d_conv2          [64, 64, 3, 3]    [1, 64, 8, 8]  36.864k   
+40_layer3.1.BatchNorm2d_bn2                 [64]    [1, 64, 8, 8]    128.0   
+41_layer3.1.Sequential_shortcut                -    [1, 64, 8, 8]        -   
+42_layer3.2.Conv2d_conv1          [64, 64, 3, 3]    [1, 64, 8, 8]  36.864k   
+43_layer3.2.BatchNorm2d_bn1                 [64]    [1, 64, 8, 8]    128.0   
+44_layer3.2.Conv2d_conv2          [64, 64, 3, 3]    [1, 64, 8, 8]  36.864k   
+45_layer3.2.BatchNorm2d_bn2                 [64]    [1, 64, 8, 8]    128.0   
+46_layer3.2.Sequential_shortcut                -    [1, 64, 8, 8]        -   
+47_linear                              [64, 100]         [1, 100]     6.5k   
+
+                                  Mult-Adds  
+Layer                                        
+0_conv1                            442.368k  
+1_bn1                                  16.0  
+2_layer1.0.Conv2d_conv1           2.359296M  
+3_layer1.0.BatchNorm2d_bn1             16.0  
+4_layer1.0.Conv2d_conv2           2.359296M  
+5_layer1.0.BatchNorm2d_bn2             16.0  
+6_layer1.0.Sequential_shortcut            -  
+7_layer1.1.Conv2d_conv1           2.359296M  
+8_layer1.1.BatchNorm2d_bn1             16.0  
+9_layer1.1.Conv2d_conv2           2.359296M  
+10_layer1.1.BatchNorm2d_bn2            16.0  
+11_layer1.1.Sequential_shortcut           -  
+12_layer1.2.Conv2d_conv1          2.359296M  
+13_layer1.2.BatchNorm2d_bn1            16.0  
+14_layer1.2.Conv2d_conv2          2.359296M  
+15_layer1.2.BatchNorm2d_bn2            16.0  
+16_layer1.2.Sequential_shortcut           -  
+17_layer2.0.Conv2d_conv1          1.179648M  
+18_layer2.0.BatchNorm2d_bn1            32.0  
+19_layer2.0.Conv2d_conv2          2.359296M  
+20_layer2.0.BatchNorm2d_bn2            32.0  
+21_layer2.0.LambdaLayer_shortcut          -  
+22_layer2.1.Conv2d_conv1          2.359296M  
+23_layer2.1.BatchNorm2d_bn1            32.0  
+24_layer2.1.Conv2d_conv2          2.359296M  
+25_layer2.1.BatchNorm2d_bn2            32.0  
+26_layer2.1.Sequential_shortcut           -  
+27_layer2.2.Conv2d_conv1          2.359296M  
+28_layer2.2.BatchNorm2d_bn1            32.0  
+29_layer2.2.Conv2d_conv2          2.359296M  
+30_layer2.2.BatchNorm2d_bn2            32.0  
+31_layer2.2.Sequential_shortcut           -  
+32_layer3.0.Conv2d_conv1          1.179648M  
+33_layer3.0.BatchNorm2d_bn1            64.0  
+34_layer3.0.Conv2d_conv2          2.359296M  
+35_layer3.0.BatchNorm2d_bn2            64.0  
+36_layer3.0.LambdaLayer_shortcut          -  
+37_layer3.1.Conv2d_conv1          2.359296M  
+38_layer3.1.BatchNorm2d_bn1            64.0  
+39_layer3.1.Conv2d_conv2          2.359296M  
+40_layer3.1.BatchNorm2d_bn2            64.0  
+41_layer3.1.Sequential_shortcut           -  
+42_layer3.2.Conv2d_conv1          2.359296M  
+43_layer3.2.BatchNorm2d_bn1            64.0  
+44_layer3.2.Conv2d_conv2          2.359296M  
+45_layer3.2.BatchNorm2d_bn2            64.0  
+46_layer3.2.Sequential_shortcut           -  
+47_linear                              6.4k  
+-------------------------------------------------------------------------------------
+                          Totals
+Total params            275.572k
+Trainable params        275.572k
+Non-trainable params         0.0
+Mult-Adds             40.557488M
+=====================================================================================
+<torch.utils.data.dataloader.DataLoader object at 0x7f4ab8939850>
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+Conv2d(3, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+BasicBlock(
+  (conv1): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): Sequential()
+)
+num_pruned 9
+BasicBlock(
+  (conv1): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): Sequential()
+)
+num_pruned 9
+BasicBlock(
+  (conv1): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): Sequential()
+)
+num_pruned 9
+BasicBlock(
+  (conv1): Conv2d(16, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): LambdaLayer()
+)
+num_pruned 17
+BasicBlock(
+  (conv1): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): Sequential()
+)
+num_pruned 17
+BasicBlock(
+  (conv1): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): Sequential()
+)
+num_pruned 17
+BasicBlock(
+  (conv1): Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): LambdaLayer()
+)
+num_pruned 33
+BasicBlock(
+  (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): Sequential()
+)
+num_pruned 33
+BasicBlock(
+  (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (shortcut): Sequential()
+)
+num_pruned 33
+Linear(in_features=64, out_features=100, bias=True)
+=====================================================================================
+                                    Kernel Shape     Output Shape   Params  \
+Layer                                                                        
+0_conv1                            [3, 16, 3, 3]  [1, 16, 32, 32]    432.0   
+1_bn1                                       [16]  [1, 16, 32, 32]     32.0   
+2_layer1.0.Conv2d_conv1            [16, 7, 3, 3]   [1, 7, 32, 32]   1.008k   
+3_layer1.0.BatchNorm2d_bn1                   [7]   [1, 7, 32, 32]     14.0   
+4_layer1.0.Conv2d_conv2            [7, 16, 3, 3]  [1, 16, 32, 32]   1.008k   
+5_layer1.0.BatchNorm2d_bn2                  [16]  [1, 16, 32, 32]     32.0   
+6_layer1.0.Sequential_shortcut                 -  [1, 16, 32, 32]        -   
+7_layer1.1.Conv2d_conv1            [16, 7, 3, 3]   [1, 7, 32, 32]   1.008k   
+8_layer1.1.BatchNorm2d_bn1                   [7]   [1, 7, 32, 32]     14.0   
+9_layer1.1.Conv2d_conv2            [7, 16, 3, 3]  [1, 16, 32, 32]   1.008k   
+10_layer1.1.BatchNorm2d_bn2                 [16]  [1, 16, 32, 32]     32.0   
+11_layer1.1.Sequential_shortcut                -  [1, 16, 32, 32]        -   
+12_layer1.2.Conv2d_conv1           [16, 7, 3, 3]   [1, 7, 32, 32]   1.008k   
+13_layer1.2.BatchNorm2d_bn1                  [7]   [1, 7, 32, 32]     14.0   
+14_layer1.2.Conv2d_conv2           [7, 16, 3, 3]  [1, 16, 32, 32]   1.008k   
+15_layer1.2.BatchNorm2d_bn2                 [16]  [1, 16, 32, 32]     32.0   
+16_layer1.2.Sequential_shortcut                -  [1, 16, 32, 32]        -   
+17_layer2.0.Conv2d_conv1          [16, 15, 3, 3]  [1, 15, 16, 16]    2.16k   
+18_layer2.0.BatchNorm2d_bn1                 [15]  [1, 15, 16, 16]     30.0   
+19_layer2.0.Conv2d_conv2          [15, 32, 3, 3]  [1, 32, 16, 16]    4.32k   
+20_layer2.0.BatchNorm2d_bn2                 [32]  [1, 32, 16, 16]     64.0   
+21_layer2.0.LambdaLayer_shortcut               -  [1, 32, 16, 16]        -   
+22_layer2.1.Conv2d_conv1          [32, 15, 3, 3]  [1, 15, 16, 16]    4.32k   
+23_layer2.1.BatchNorm2d_bn1                 [15]  [1, 15, 16, 16]     30.0   
+24_layer2.1.Conv2d_conv2          [15, 32, 3, 3]  [1, 32, 16, 16]    4.32k   
+25_layer2.1.BatchNorm2d_bn2                 [32]  [1, 32, 16, 16]     64.0   
+26_layer2.1.Sequential_shortcut                -  [1, 32, 16, 16]        -   
+27_layer2.2.Conv2d_conv1          [32, 15, 3, 3]  [1, 15, 16, 16]    4.32k   
+28_layer2.2.BatchNorm2d_bn1                 [15]  [1, 15, 16, 16]     30.0   
+29_layer2.2.Conv2d_conv2          [15, 32, 3, 3]  [1, 32, 16, 16]    4.32k   
+30_layer2.2.BatchNorm2d_bn2                 [32]  [1, 32, 16, 16]     64.0   
+31_layer2.2.Sequential_shortcut                -  [1, 32, 16, 16]        -   
+32_layer3.0.Conv2d_conv1          [32, 31, 3, 3]    [1, 31, 8, 8]   8.928k   
+33_layer3.0.BatchNorm2d_bn1                 [31]    [1, 31, 8, 8]     62.0   
+34_layer3.0.Conv2d_conv2          [31, 64, 3, 3]    [1, 64, 8, 8]  17.856k   
+35_layer3.0.BatchNorm2d_bn2                 [64]    [1, 64, 8, 8]    128.0   
+36_layer3.0.LambdaLayer_shortcut               -    [1, 64, 8, 8]        -   
+37_layer3.1.Conv2d_conv1          [64, 31, 3, 3]    [1, 31, 8, 8]  17.856k   
+38_layer3.1.BatchNorm2d_bn1                 [31]    [1, 31, 8, 8]     62.0   
+39_layer3.1.Conv2d_conv2          [31, 64, 3, 3]    [1, 64, 8, 8]  17.856k   
+40_layer3.1.BatchNorm2d_bn2                 [64]    [1, 64, 8, 8]    128.0   
+41_layer3.1.Sequential_shortcut                -    [1, 64, 8, 8]        -   
+42_layer3.2.Conv2d_conv1          [64, 31, 3, 3]    [1, 31, 8, 8]  17.856k   
+43_layer3.2.BatchNorm2d_bn1                 [31]    [1, 31, 8, 8]     62.0   
+44_layer3.2.Conv2d_conv2          [31, 64, 3, 3]    [1, 64, 8, 8]  17.856k   
+45_layer3.2.BatchNorm2d_bn2                 [64]    [1, 64, 8, 8]    128.0   
+46_layer3.2.Sequential_shortcut                -    [1, 64, 8, 8]        -   
+47_linear                              [64, 100]         [1, 100]     6.5k   
+
+                                  Mult-Adds  
+Layer                                        
+0_conv1                            442.368k  
+1_bn1                                  16.0  
+2_layer1.0.Conv2d_conv1           1.032192M  
+3_layer1.0.BatchNorm2d_bn1              7.0  
+4_layer1.0.Conv2d_conv2           1.032192M  
+5_layer1.0.BatchNorm2d_bn2             16.0  
+6_layer1.0.Sequential_shortcut            -  
+7_layer1.1.Conv2d_conv1           1.032192M  
+8_layer1.1.BatchNorm2d_bn1              7.0  
+9_layer1.1.Conv2d_conv2           1.032192M  
+10_layer1.1.BatchNorm2d_bn2            16.0  
+11_layer1.1.Sequential_shortcut           -  
+12_layer1.2.Conv2d_conv1          1.032192M  
+13_layer1.2.BatchNorm2d_bn1             7.0  
+14_layer1.2.Conv2d_conv2          1.032192M  
+15_layer1.2.BatchNorm2d_bn2            16.0  
+16_layer1.2.Sequential_shortcut           -  
+17_layer2.0.Conv2d_conv1            552.96k  
+18_layer2.0.BatchNorm2d_bn1            15.0  
+19_layer2.0.Conv2d_conv2           1.10592M  
+20_layer2.0.BatchNorm2d_bn2            32.0  
+21_layer2.0.LambdaLayer_shortcut          -  
+22_layer2.1.Conv2d_conv1           1.10592M  
+23_layer2.1.BatchNorm2d_bn1            15.0  
+24_layer2.1.Conv2d_conv2           1.10592M  
+25_layer2.1.BatchNorm2d_bn2            32.0  
+26_layer2.1.Sequential_shortcut           -  
+27_layer2.2.Conv2d_conv1           1.10592M  
+28_layer2.2.BatchNorm2d_bn1            15.0  
+29_layer2.2.Conv2d_conv2           1.10592M  
+30_layer2.2.BatchNorm2d_bn2            32.0  
+31_layer2.2.Sequential_shortcut           -  
+32_layer3.0.Conv2d_conv1           571.392k  
+33_layer3.0.BatchNorm2d_bn1            31.0  
+34_layer3.0.Conv2d_conv2          1.142784M  
+35_layer3.0.BatchNorm2d_bn2            64.0  
+36_layer3.0.LambdaLayer_shortcut          -  
+37_layer3.1.Conv2d_conv1          1.142784M  
+38_layer3.1.BatchNorm2d_bn1            31.0  
+39_layer3.1.Conv2d_conv2          1.142784M  
+40_layer3.1.BatchNorm2d_bn2            64.0  
+41_layer3.1.Sequential_shortcut           -  
+42_layer3.2.Conv2d_conv1          1.142784M  
+43_layer3.2.BatchNorm2d_bn1            31.0  
+44_layer3.2.Conv2d_conv2          1.142784M  
+45_layer3.2.BatchNorm2d_bn2            64.0  
+46_layer3.2.Sequential_shortcut           -  
+47_linear                              6.4k  
+-------------------------------------------------------------------------------------
+                          Totals
+Total params             135.97k
+Trainable params         135.97k
+Non-trainable params         0.0
+Mult-Adds             19.010303M
+=====================================================================================
+[Epoch 10/30] [TRAIN] Loss 1.4749 (1.3749)	 Acc: 58.824 (66.360)	 Time 0.060 (0.136)
+**[Epoch 10/30] [VAL] Loss 1.3508 (1.4122)	 Acc: 67.647 (65.080)	 TotalTime: 0h 1min
+
+[Epoch 20/30] [TRAIN] Loss 0.8805 (1.1237)	 Acc: 76.471 (70.920)	 Time 0.049 (0.113)
+**[Epoch 20/30] [VAL] Loss 1.0352 (1.1199)	 Acc: 77.941 (70.280)	 TotalTime: 0h 1min
+
+[Epoch 30/30] [TRAIN] Loss 0.6969 (1.0104)	 Acc: 76.471 (72.040)	 Time 0.053 (0.117)
+**[Epoch 30/30] [VAL] Loss 1.0512 (0.9200)	 Acc: 73.529 (72.840)	 TotalTime: 0h 2min
+
+**[TEST] Loss 1.0066 (1.0191)	 Acc: 78.448 (75.600)	
+
+
+==========================================================
+#                                                          #
+#                  Test acc : 75.6000                  #
+#                                                          #
+==========================================================
+
