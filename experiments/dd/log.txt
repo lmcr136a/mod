@@ -1,0 +1,3 @@
+for_trainNval :     CIFAR100
+Files already downloaded and verified
+Files already downloaded and verified

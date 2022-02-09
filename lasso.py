@@ -45,8 +45,6 @@ class AssembleNetResNet(BaseAgent):
         self.manual_seed = self.config.get("seed", 9099)
         if self.cuda:
             self.device = torch.device("cuda")
-            torch.cuda.manual_seed(self.manual_seed)
-            torch.cuda.set_device(self.config.get("gpu_device", 0))
 
             self.logger.info("Program will run on *****GPU-CUDA*****\n")
             print_cuda_statistics()
@@ -282,7 +280,8 @@ class AssembleNetResNet(BaseAgent):
                     module_surgery(conv1, bn1, conv2, indices_stayed)
             return
 
-        print(self.data_loader.train_loader)
+        print("DATALOADER LABELS: ", self.data_loader.train_loader.dataset.targets[:30])
+        
         inputs, _ = next(iter(self.data_loader.train_loader))
         if self.cuda:
             inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
@@ -436,7 +435,7 @@ class AssembleNetResNet(BaseAgent):
                     elif isinstance(m, torch.nn.Linear):
                         break
                     x = m(x)
-                # break  ##########################
+                break  ##########################
             torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
 
         else:

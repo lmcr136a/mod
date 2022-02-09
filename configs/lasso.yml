@@ -1,5 +1,7 @@
 data:
-  dir: CIFAR100
+  for_trainNval: INV100
+  for_test: CIFAR100
+
   train:
     augmentation: null
     batch_size: 128
@@ -16,28 +18,30 @@ data:
     n_workers: 4
     pin_memory: true
     shuffle: false
-
   target_classes: [0, 1, 2, 3, 4]
 
-network:
-  backbone: resnet20
+network: 
+  model: resnet34
+  load_state: experiments/pretrained/cifar100_res34_100epo/cifar100_resnet34_7802.pth
+  # load_state: experiments/pretrained/cifar100_res20_100epo/best_model.pt
+  
+  lasso:
+    all_classes: False  # 기본 compress: True ,  saved_index 관련 없음
+                        # 클래스별 프루닝: False
+    k: 0.49             #
+    # saved_index: experiments/lasso_res20/lasso_one_batch__049/total_indices_stayed.pt
+    saved_index: #experiments/res34_cifar100_1b_049/total_indices_stayed.pt
+    # batch: 512
 
 run:
-  load_state: experiments/cifar100_res20_100epo/best_model.pt
-  pruning: random
-  lasso:
-    all_classes: True  # 기본 lasso compress, saved_index 관련 없음
-    k: 0.49
-    # batch: 512
-    saved_index: #experiments/lasso_one_batch/total_indices_stayed.pt
-  
   seed: 9099
   gpu_device: 1
   epoch: 30
-  figure_interval: 10
+  figure_interval: 50
   plot_interval: 10
-  print_interval: 10
+  print_interval: 5
   val_interval: 10
+
   loss: crossentropy
   optimizer:
     lr: 1.0e-4
