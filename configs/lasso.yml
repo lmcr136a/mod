@@ -28,14 +28,14 @@ network:
   lasso:
     all_classes: False  # 기본 compress: True ,  saved_index 관련 없음
                         # 클래스별 프루닝: False
-    k: 0.49             #
+    k: 0.3             #
     # saved_index: experiments/lasso_res20/lasso_one_batch__049/total_indices_stayed.pt
     saved_index: #experiments/res34_cifar100_1b_049/total_indices_stayed.pt
     # batch: 512
 
 run:
   seed: 9099
-  gpu_device: 1
+  gpu_device: 2
   epoch: 30
   figure_interval: 50
   plot_interval: 10

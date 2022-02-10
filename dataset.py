@@ -190,12 +190,12 @@ class InversionDataLoader:
         valid_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)
         test_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)
 
-        # tmean, tstd = get_mean_std(train_set)
-        # vmean, vstd = get_mean_std(valid_set)
-        # testmean, teststd = get_mean_std(test_set)
+        tmean, tstd = get_mean_std(train_set)
+        vmean, vstd = get_mean_std(valid_set)
+        testmean, teststd = get_mean_std(test_set)
         
-        mean, std = [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
-        tmean, tstd, vmean, vstd, testmean, teststd = mean, std, mean, std, mean, std
+        # mean, std = [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
+        # tmean, tstd, vmean, vstd, testmean, teststd = mean, std, mean, std, mean, std
 
         train_set.transform = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
