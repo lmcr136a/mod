@@ -3,23 +3,14 @@ import argparse
 import warnings
 warnings.filterwarnings('ignore')
 
-from utils import configuration, show_test_acc
-from dataset import get_data_loader, get_data_set
-from models.model import get_network
+from utils.utils import configuration, show_test_acc
 from run import run
 
 
 def main(args):
     cfg, writer = configuration(args.config)
 
-    dataset, n_class = get_data_set(cfg["data"])
-    dataloader = get_data_loader(dataset, cfg["data"])
-
-    network = get_network(cfg["network"], n_class)
-
-    result = run(dataset, dataloader, network, cfg["run"], writer)
-
-    show_test_acc(result)
+    run(cfg, writer)
 
 
 
@@ -30,7 +21,7 @@ if __name__ == '__main__':
         "-c",
         nargs="?",
         type=str,
-        default="configs/test.yml",
+        default="configs/lasso.yml",
         help="Configuration file to use, .yml format",
     )
     args = parser.parse_args()
