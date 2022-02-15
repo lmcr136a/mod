@@ -289,49 +289,20 @@ class AssembleNetResNet(BaseAgent):
         inputs.cpu()
         start = time.time()
         
-        if method == 'manual':  # 미리 저장된 레이어당 채널 번호로 프루닝
+        total_indices_stayed = [[] for i in range(len(self.all_list))]
+        print(f"mmmmmmmmmmmmmmmmmmmmmmmmmm {method} mmmmmmmmmmmmmmmmmmmmmmmmmm")
+        if method == 'max_output':    # 채널의 가장 큰 아웃풋을 활용한 중요도로 프루닝
             x = inputs
             for i, m in enumerate(self.all_list):
                 if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
-                    conv1 = self.named_modules_list[str(i) + '.conv1']
-                    bn1 = self.named_modules_list[str(i) + '.bn1']
-                    conv2 = self.named_modules_list[str(i) + '.conv2']
-                    indices_stayed = list(self.stayed_channels[str(i) + '.conv1'])
-                    module_surgery(conv1, bn1, conv2, indices_stayed)
-                    pruned_input_feature = torch.relu(bn1(conv1(x)))
-                    output_feature = self.original_conv_output[str(i) + '.conv2']
-                    weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
-                    self.stayed_channels[str(i) + '.conv1'] = set(indices_stayed)
-                elif isinstance(m, torch.nn.Linear):
-                    break
-                x = m(x)
-                
-        elif method == 'random':
-            x = inputs
-            for i, m in enumerate(self.all_list):
-                if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
-                    conv1 = self.named_modules_list[str(i) + '.conv1']
-                    bn1 = self.named_modules_list[str(i) + '.bn1']
-                    conv2 = self.named_modules_list[str(i) + '.conv2']
-                    indices_stayed = list(self.random_selected_stayed_channels[str(i) + '.conv1'])
-                    module_surgery(conv1, bn1, conv2, indices_stayed)
-                    pruned_input_feature = torch.relu(bn1(conv1(x)))
-                    output_feature = self.original_conv_output[str(i) + '.conv2']
-                    weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
-                elif isinstance(m, torch.nn.Linear):
-                    break
-                x = m(x)
-
-        elif method == 'max_output':    # 채널의 가장 큰 아웃풋을 활용한 중요도로 프루닝
-            x = inputs
-            for i, m in enumerate(self.all_list):
-                if isinstance(m, models.resnet.BasicBlock):
-                    conv1 = self.named_modules_list[str(i) + '.conv1']
-                    bn1 = self.named_modules_list[str(i) + '.bn1']
-                    conv2 = self.named_modules_list[str(i) + '.conv2']
+                    conv1 = self.named_modules_list[str(i)].conv1
+                    bn1 = self.named_modules_list[str(i)].bn1
+                    conv2 = self.named_modules_list[str(i)].conv2
                     num_channel = int(k * conv1.out_channels)
                     channel_norm = conv1(x).norm(dim=(2, 3)).mean(dim=0)
                     indices_stayed = torch.argsort(channel_norm, descending=True)[:num_channel]  # 가장 큰 채널들의 index를 리턴
+                    total_indices_stayed[i].append(indices_stayed)
+
                     module_surgery(conv1, bn1, conv2, indices_stayed)
                     pruned_input_feature = torch.relu(bn1(conv1(x)))
                     output_feature = self.original_conv_output[str(i) + '.conv2']
@@ -343,15 +314,16 @@ class AssembleNetResNet(BaseAgent):
             x = inputs
             for i, m in enumerate(self.all_list):
                 if isinstance(m, models.resnet_imagenet.Bottleneck):
-                    conv1 = self.named_modules_list[str(i) + '.conv1']
-                    bn1 = self.named_modules_list[str(i) + '.bn1']
-                    conv2 = self.named_modules_list[str(i) + '.conv2']
-                    bn2 = self.named_modules_list[str(i) + '.bn2']
-                    conv3 = self.named_modules_list[str(i) + '.conv3']
+                    conv1 = self.named_modules_list[str(i)].conv1
+                    bn1 = self.named_modules_list[str(i)].bn1
+                    conv2 = self.named_modules_list[str(i)].conv2
+                    bn2 = self.named_modules_list[str(i)].bn2
+                    conv3 = self.named_modules_list[str(i)].conv3
 
 
                     f_input_feature = torch.relu(bn1(conv1(x)))
                     f_indices_stayed, f_indices_pruned = channel_selection(f_input_feature, conv2, sparsity=(1.-k), method='greedy')
+                    total_indices_stayed[i].append(f_indices_stayed)
                     module_surgery(conv1, bn1, conv2, f_indices_stayed)
                     f_pruned_input_feature = torch.relu(bn1(conv1(x)))
                     f_output_feature = self.original_conv_output[str(i) + '.conv2']
@@ -372,8 +344,6 @@ class AssembleNetResNet(BaseAgent):
 
         elif method == 'lasso': ###################################################################
             x = inputs
-            print("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-            total_indices_stayed = [[] for i in range(len(self.all_list))]
             for i, m in enumerate(self.all_list):
                 print(m)
                 if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
@@ -392,8 +362,8 @@ class AssembleNetResNet(BaseAgent):
                 elif isinstance(m, torch.nn.Linear):
                     break
                 x = m(x)
-            torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
-            print(total_indices_stayed)
+        torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
+        print(total_indices_stayed)
         self.original_conv_output = dict()  # clear original output to save cuda memory
 
 

@@ -9,7 +9,7 @@ import torch.nn.utils.prune as prune
 from utils.metrics import AverageMeter, accuracy
 from figure import plot_classes_preds
 from torchsummaryX import summary
-from lasso import AssembleNetResNet
+from pruning import AssembleNetResNet
 from utils.utils import show_test_acc
 from dataset import get_dataloader, get_test_dataloader
 from models.model import get_network
@@ -57,17 +57,17 @@ def run(cfg, writer):
 
 
 
-    if cfg["network"].get("lasso", None):
+    if cfg["network"].get("pruning", None):
 
         agent = AssembleNetResNet(cfg_run, dataloader, network, optimizer, criterion, n_class)   ## INV
         agent.init_graph(pretrained=False)
         summary(agent.model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
-        if cfg["network"]["lasso"]["all_classes"]:
-            all_class_dataloader, _ = get_dataloader(cfg)
-            agent.data_loader = all_class_dataloader
-            agent.compress(writer.log_dir, method="lasso", k=cfg["network"]["lasso"].get("k", 0.49))
+        if cfg["network"]["pruning"]["all_classes"]:
+            # all_class_dataloader, _ = get_dataloader(cfg)
+            # agent.data_loader = all_class_dataloader
+            agent.compress(writer.log_dir, method=cfg["network"]["pruning"].get("method", "lasso"), k=cfg["network"]["pruning"].get("k", 0.49))
         else:
-            agent.lasso_compress(cfg["network"]["lasso"], writer.log_dir)
+            agent.lasso_compress(cfg["network"]["pruning"], writer.log_dir)
             
         summary(agent.model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
         show_test_acc(test(test_dataloader, network, criterion, device))   ## CIFAR
