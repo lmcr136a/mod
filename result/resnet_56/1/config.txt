@@ -1,0 +1,18 @@
+2022-02-15-06:01:59
+
+data_dir: ./data
+arch: resnet_56
+lr_type: cos
+result_dir: ./result/resnet_56/1
+batch_size: 256
+epochs: 200
+label_smooth: 0
+learning_rate: 0.01
+lr_decay_step: 50,100
+momentum: 0.99
+weight_decay: 0.001
+pretrain_dir: ./chip/pretrained_models/resnet_56.pt
+ci_dir: ./CI_resnet_56
+sparsity: [0.]+[0.4]*2+[0.5]*9+[0.6]*9+[0.7]*9
+gpu: 0
+

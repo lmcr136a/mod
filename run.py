@@ -9,7 +9,9 @@ import torch.nn.utils.prune as prune
 from utils.metrics import AverageMeter, accuracy
 from figure import plot_classes_preds
 from torchsummaryX import summary
-from pruning import AssembleNetResNet
+
+from prunings.lasso import AssembleNetResNet
+from prunings.chip import calculate_ci, calculate_feature_map, prune_finetune_cifar
 from utils.utils import show_test_acc
 from dataset import get_dataloader, get_test_dataloader
 from models.model import get_network
@@ -54,27 +56,52 @@ def run(cfg, writer):
         torch.save(network.state_dict(), writer.log_dir+"/best_model.pt")
 
     show_test_acc(test(test_dataloader, network, criterion, device))   ## CIFAR
+    ################################################################
 
-
-
+    summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
     if cfg["network"].get("pruning", None):
+        if cfg["network"]["pruning"].get("lasso", None):
+            network = lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir)
+        elif cfg["network"]["pruning"].get("chip", None):
+            chip()
+        elif cfg["network"]["pruning"].get("hrank", None):
+            hrank()
+        elif cfg["network"]["pruning"].get("var", None):
+            var()
 
-        agent = AssembleNetResNet(cfg_run, dataloader, network, optimizer, criterion, n_class)   ## INV
-        agent.init_graph(pretrained=False)
-        summary(agent.model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
-        if cfg["network"]["pruning"]["all_classes"]:
-            # all_class_dataloader, _ = get_dataloader(cfg)
-            # agent.data_loader = all_class_dataloader
-            agent.compress(writer.log_dir, method=cfg["network"]["pruning"].get("method", "lasso"), k=cfg["network"]["pruning"].get("k", 0.49))
-        else:
-            agent.lasso_compress(cfg["network"]["pruning"], writer.log_dir)
             
-        summary(agent.model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
+        summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
         show_test_acc(test(test_dataloader, network, criterion, device))   ## CIFAR
 
         network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)   ## INV
         show_test_acc(test(test_dataloader, network, criterion, device))   ## CIFAR
     
+
+def lasso(cfg, dataloader, network, optimizer, criterion, n_class, log_dir):
+    agent = AssembleNetResNet(cfg["run"], dataloader, network, optimizer, criterion, n_class)   ## INV
+    agent.init_graph(pretrained=False)
+    if cfg["network"]["pruning"]["all_classes"]:
+        all_class_dataloader, _ = get_dataloader(cfg)
+        agent.data_loader = all_class_dataloader
+        agent.compress(log_dir, method=cfg["network"]["pruning"].get("method", "lasso"), k=cfg["network"]["pruning"].get("k", 0.49))
+    else:
+        agent.lasso_compress(cfg["network"]["pruning"]["lasso"], log_dir)
+
+    return agent.model
+
+
+def chip(network, cfg_network, train_loader, log_dir):
+    calculate_feature_map(network, cfg_network["model"], train_loader)
+    ci_dir = calculate_ci(cfg_network["model"], log_dir)
+    prune_finetune_cifar(cfg_network["model"], cfg_network["load_state"], ci_dir)
+
+def hrank():
+    pass
+
+
+def var():
+    pass
+
 
 
 def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer):
