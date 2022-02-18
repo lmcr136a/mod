@@ -41,53 +41,6 @@ def get_test_dataloader(cfg, dataloader, get_only_targets=False):
         return get_dataloader(cfg, for_test=True, get_only_targets=get_only_targets)
 
 
-# class CifarDataLoader:
-#     def __init__(self, config, class_num, get_only_targets, target_classes=[0,1,2,3,4]):
-#         torch.backends.cudnn.benchmark = False
-#         torch.backends.cudnn.deterministic = True
-#         torch.manual_seed(config.get("seed", 9099))
-#         torch.cuda.manual_seed(config.get("seed", 9099))
-#         random.seed(config.get("seed", 9099))
-#         np.random.seed(config.get("seed", 9099))
-#         self.config = config
-#         self.logger = logging.getLogger("Cifar100DataLoader")
-#         self.mean, self.std = [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
-
-
-#         self.logger.info("Loading DATA.....")
-#         train_transform = transforms.Compose([
-#             transforms.RandomCrop(32, padding=4),
-#             transforms.RandomHorizontalFlip(),
-#             transforms.RandomRotation(15),
-#             transforms.ToTensor(),
-#             transforms.Normalize(self.mean, self.std)])
-
-#         valid_transform = transforms.Compose([
-#             transforms.ToTensor(),
-#             transforms.Normalize(self.mean, self.std)])
-
-#         train_set = datasets.CIFAR100("./data", train=True, download=True, transform=train_transform)
-#         valid_set = datasets.CIFAR100("./data", train=True, download=True, transform=train_transform)
-#         test_set = datasets.CIFAR100("./data", train=False, transform=valid_transform)
-
-
-#         if target_classes:
-#             for dataset in [train_set, valid_set, test_set]:
-#                 idx = torch.Tensor([i for i, v in enumerate(dataset.targets) if v in target_classes]).long()
-#                 dataset.targets = torch.Tensor(dataset.targets)[idx]
-#                 dataset.data = torch.Tensor(dataset.data)[idx].cpu().detach().numpy().astype(np.uint8)
-
-#         self.train_loader = DataLoader(train_set, batch_size=self.config.get("batch_size", 128), shuffle=True,
-#                                        num_workers=self.config.get("n_workers", 4), pin_memory=self.config.get("pin_memory", True))
-#         self.valid_loader = DataLoader(valid_set, batch_size=self.config.get("batch_size", 128), shuffle=True,
-#                                        num_workers=self.config.get("n_workers", 4), pin_memory=self.config.get("pin_memory", True))
-#         self.test_loader = DataLoader(test_set, batch_size=self.config.get("batch_size", 128), shuffle=True,
-#                                        num_workers=self.config.get("n_workers", 4), pin_memory=self.config.get("pin_memory", True))
-#         self.train_iterations = len(self.train_loader)
-#         self.valid_iterations = len(self.valid_loader)
-#         self.test_iterations = len(self.test_loader)
-
-
 class CifarDataLoader:
     def __init__(self, config, class_num, get_only_targets, target_classes):
         config = config["run"]
@@ -113,10 +66,14 @@ class CifarDataLoader:
         else:
             raise ValueError('check class num in cifar dataloader')
 
+        # mean, std = [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
+        tmean, tstd = [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
+        vmean, vstd = [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
+        testmean, teststd = [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
 
-        tmean, tstd = get_mean_std(train_set)
-        vmean, vstd = get_mean_std(valid_set)
-        testmean, teststd = get_mean_std(test_set)
+        # tmean, tstd = get_mean_std(train_set)
+        # vmean, vstd = get_mean_std(valid_set)
+        # testmean, teststd = get_mean_std(test_set)
 
         train_set.transform = transforms.Compose([
             transforms.RandomCrop(32, padding=4),

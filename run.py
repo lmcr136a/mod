@@ -28,7 +28,7 @@ def run(cfg, writer):
     """
     dataloader, n_class = get_dataloader(cfg, get_only_targets=True)
     test_dataloader, _ = get_test_dataloader(cfg, dataloader, get_only_targets=True)
-    network = get_network(cfg["network"]["model"], n_class)
+    network = get_network(cfg["network"], n_class)
 
     cfg_run = cfg["run"]
 
@@ -61,9 +61,9 @@ def run(cfg, writer):
     summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
     if cfg["network"].get("pruning", None):
         if cfg["network"]["pruning"].get("lasso", None):
-            network = lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir)
+            lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("chip", None):
-            chip()
+            chip(network, cfg["network"], dataloader.train_loader, writer.log_dir)
         elif cfg["network"]["pruning"].get("hrank", None):
             hrank()
         elif cfg["network"]["pruning"].get("var", None):
@@ -87,11 +87,9 @@ def lasso(cfg, dataloader, network, optimizer, criterion, n_class, log_dir):
     else:
         agent.lasso_compress(cfg["network"]["pruning"]["lasso"], log_dir)
 
-    return agent.model
-
 
 def chip(network, cfg_network, train_loader, log_dir):
-    calculate_feature_map(network, cfg_network["model"], train_loader)
+    calculate_feature_map(network, cfg_network["model"], train_loader, log_dir=log_dir)
     ci_dir = calculate_ci(cfg_network["model"], log_dir)
     prune_finetune_cifar(cfg_network["model"], cfg_network["load_state"], ci_dir)
 

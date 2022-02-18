@@ -21,7 +21,6 @@ if __name__ == '__main__':
         "-c",
         nargs="?",
         type=str,
-        default="configs/lasso.yml",
         help="Configuration file to use, .yml format",
     )
     args = parser.parse_args()

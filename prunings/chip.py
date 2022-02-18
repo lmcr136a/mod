@@ -8,21 +8,21 @@ import time
 from thop import profile
 from collections import OrderedDict
 
+conv_index = torch.tensor(1)
 
-def calculate_feature_map(model, model_name, train_loader, device="cuda", repeat=5):
+def calculate_feature_map(model, model_name, train_loader, log_dir, device="cuda", repeat=5):
 
     def get_feature_hook(self, input, output):
         global conv_index
 
-        if not os.path.isdir('conv_feature_map/' + model_name + '_repeat%d' % (repeat)):
-            os.makedirs('conv_feature_map/' + model_name + '_repeat%d' % (repeat))
-        np.save('conv_feature_map/' + model_name + '_repeat%d' % (repeat) + '/conv_feature_map_'+ str(conv_index) + '.npy',
+        if not os.path.isdir(log_dir +'/conv_feature_map/' + model_name + '_repeat%d' % (repeat)):
+            os.makedirs(log_dir +'/conv_feature_map/' + model_name + '_repeat%d' % (repeat))
+        np.save(log_dir +'/conv_feature_map/' + model_name + '_repeat%d' % (repeat) + '/conv_feature_map_'+ str(conv_index) + '.npy',
                 output.cpu().numpy())
         conv_index += 1
 
     def inference():
         model.eval()
-        repeat = repeat
         with torch.no_grad():
             for batch_idx, (inputs, targets) in enumerate(train_loader):
                 #use 5 batches to get feature maps.
@@ -46,7 +46,7 @@ def calculate_feature_map(model, model_name, train_loader, device="cuda", repeat
             inference()
             handler.remove()
 
-    elif model_name=='resnet_56':
+    elif model_name=='resnet56':
 
         cov_layer = eval('model.relu')
         handler = cov_layer.register_forward_hook(get_feature_hook)
@@ -70,7 +70,7 @@ def calculate_feature_map(model, model_name, train_loader, device="cuda", repeat
                 handler.remove()
                 cnt += 1
 
-    elif model_name=='resnet_110':
+    elif model_name=='resnet110':
 
         cov_layer = eval('model.relu')
         handler = cov_layer.register_forward_hook(get_feature_hook)
@@ -96,7 +96,7 @@ def calculate_feature_map(model, model_name, train_loader, device="cuda", repeat
                 handler.remove()
                 cnt += 1
 
-    elif model_name=='resnet_50':
+    elif model_name=='resnet50':
         cov_layer = eval('model.maxpool')
         handler = cov_layer.register_forward_hook(get_feature_hook)
         inference()
@@ -159,7 +159,7 @@ def calculate_ci(model_name, log_dir, repeat=5):
             for i in range(repeat):
                 index = j * repeat + i + 1
                 # add
-                path_conv = "./conv_feature_map/{0}_repeat5/conv_feature_map_tensor({1}).npy".format(model_name, str(index))
+                path_conv = log_dir+"/conv_feature_map/{0}_repeat5/conv_feature_map_tensor({1}).npy".format(model_name, str(index))
                 # path_nuc = "./feature_conv_nuc/resnet_56_repeat5/feature_conv_nuctensor({0}).npy".format(str(index))
                 # batch_ci = ci_score(path_conv, path_nuc)
                 batch_ci = ci_score(path_conv)
@@ -171,15 +171,15 @@ def calculate_ci(model_name, log_dir, repeat=5):
 
         return np.array(layer_ci_mean_total)
 
-    if model_name == "resnet_56":
+    if model_name == "resnet56":
         num_layers = 55
-    elif model_name == "resnet_50":
+    elif model_name == "resnet50":
         num_layers = 53
     save_path = log_dir + '/CI_' + model_name
 
     ci = mean_repeat_ci(repeat, num_layers)
 
-    if model_name == 'resnet_50':
+    if model_name == 'resnet50':
         num_layers = 53
     for i in range(num_layers):
         print(i)
@@ -223,7 +223,7 @@ def prune_finetune_cifar(model_name, pretrain_dir, ci_dir):
     origin_model = eval(model_name)(sparsity=[0.] * 100).cuda()
     ckpt = torch.load(pretrain_dir, map_location='cuda:0')
 
-    if model_name == 'resnet_110':
+    if model_name == 'resnet110':
         new_state_dict = OrderedDict()
         for k, v in ckpt['state_dict'].items():
             new_state_dict[k.replace('module.', '')] = v
@@ -235,9 +235,9 @@ def prune_finetune_cifar(model_name, pretrain_dir, ci_dir):
 
     if model_name == 'vgg_16_bn':
         load_vgg_model(model, oristate_dict, ci_dir)
-    elif model_name == 'resnet_56':
+    elif model_name == 'resnet56':
         load_resnet_model(model, oristate_dict, 56, ci_dir)
-    elif model_name == 'resnet_110':
+    elif model_name == 'resnet110':
         load_resnet_model(model, oristate_dict, 110, ci_dir)
     else:
         raise
