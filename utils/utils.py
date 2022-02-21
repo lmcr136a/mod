@@ -2,9 +2,11 @@ import time
 import datetime
 import os
 import sys
+import torch
 import shutil
 import yaml
 from torch.utils.tensorboard import SummaryWriter
+from thop import profile
 
 def configuration(config):
     """
@@ -30,3 +32,10 @@ def show_test_acc(result):
     print('#                  Test acc : {:.4f}                  #'.format(result))
     print('#                                                          #')
     print('==========================================================\n')
+
+
+def show_profile(network):
+    input_image = torch.randn(1, 3, 32, 32).cuda()
+    flops, params = profile(network, inputs=(input_image,))
+    print('Params: %.2f' % (params))
+    print('Flops: %.2f' % (flops))

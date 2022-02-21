@@ -12,7 +12,7 @@ from torchsummaryX import summary
 
 from prunings.lasso import AssembleNetResNet
 from prunings.chip import calculate_ci, calculate_feature_map, prune_finetune_cifar
-from utils.utils import show_test_acc
+from utils.utils import show_test_acc, show_profile
 from dataset import get_dataloader, get_test_dataloader
 from models.model import get_network
 
@@ -59,11 +59,13 @@ def run(cfg, writer):
     ################################################################
 
     summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
+    show_profile(network)
+
     if cfg["network"].get("pruning", None):
         if cfg["network"]["pruning"].get("lasso", None):
             lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("chip", None):
-            chip(network, cfg["network"], dataloader.train_loader, writer.log_dir)
+            network = chip(network, cfg["network"], dataloader.train_loader, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("hrank", None):
             hrank()
         elif cfg["network"]["pruning"].get("var", None):
@@ -71,6 +73,7 @@ def run(cfg, writer):
 
             
         summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
+        show_profile(network)
         show_test_acc(test(test_dataloader, network, criterion, device))   ## CIFAR
 
         network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)   ## INV
@@ -88,10 +91,14 @@ def lasso(cfg, dataloader, network, optimizer, criterion, n_class, log_dir):
         agent.lasso_compress(cfg["network"]["pruning"]["lasso"], log_dir)
 
 
-def chip(network, cfg_network, train_loader, log_dir):
-    calculate_feature_map(network, cfg_network["model"], train_loader, log_dir=log_dir)
-    ci_dir = calculate_ci(cfg_network["model"], log_dir)
-    prune_finetune_cifar(cfg_network["model"], cfg_network["load_state"], ci_dir)
+def chip(network, cfg_network, train_loader, n_class, log_dir):
+    if cfg_network['pruning']["chip"].get("ci_path", None):
+        calculate_feature_map(network, cfg_network["model"], train_loader, log_dir=log_dir)
+        ci_dir = calculate_ci(cfg_network["model"], log_dir)
+    else:
+        ci_dir = cfg_network["chip"]["ci_path"]
+    network = prune_finetune_cifar(cfg_network, cfg_network["load_state"], ci_dir, n_class)
+    return network
 
 def hrank():
     pass

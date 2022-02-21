@@ -74,13 +74,7 @@ class BasicBlock(nn.Module):
                 self.shortcut = LambdaLayer(
                     lambda x: F.pad(x[:, :, :, :],
                                     (0, 0, 0, 0, (planes-inplanes)//2, planes-inplanes-(planes-inplanes)//2), "constant", 0))
-            #self.shortcut = LambdaLayer(
-            #    lambda x: F.pad(x[:, :, ::2, ::2], (0, 0, 0, 0, planes//4, planes//4),"constant", 0))
 
-            '''self.shortcut = nn.Sequential(
-                conv1x1(inplanes, planes, stride=stride),
-                #nn.BatchNorm2d(planes),
-            )#'''
 
     def forward(self, x):
         out = self.conv1(x)
@@ -120,11 +114,7 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, blocks_num=n, stride=2)
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-
-        if self.num_layer == 56:
-            self.fc = nn.Linear(64 * BasicBlock.expansion, num_classes)
-        else:
-            self.linear = nn.Linear(64 * BasicBlock.expansion, num_classes)
+        self.linear = nn.Linear(64 * BasicBlock.expansion, num_classes)
 
 
     def _make_layer(self, block, blocks_num, stride):
@@ -155,16 +145,13 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
 
-        if self.num_layer == 56:
-            x = self.fc(x)
-        else:
-            x = self.linear(x)
+        x = self.linear(x)
 
         return x
 
 
-def resnet_56(num_classes, sparsity=[0.]*100):
+def resnet56_chip(num_classes, sparsity):
     return ResNet(BasicBlock, 56, sparsity=sparsity, num_classes=num_classes)
 
-def resnet_110(num_classes, sparsity=[0.]*100):
+def resnet110_chip(num_classes, sparsity):
     return ResNet(BasicBlock, 110, sparsity=sparsity, num_classes=num_classes)

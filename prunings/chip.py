@@ -7,10 +7,12 @@ import time
 
 from thop import profile
 from collections import OrderedDict
+from models.model import get_network
 
 conv_index = torch.tensor(1)
 
 def calculate_feature_map(model, model_name, train_loader, log_dir, device="cuda", repeat=5):
+    log_dir = log_dir.split("/")[0]
 
     def get_feature_hook(self, input, output):
         global conv_index
@@ -129,6 +131,7 @@ def calculate_feature_map(model, model_name, train_loader, log_dir, device="cuda
 
 
 def calculate_ci(model_name, log_dir, repeat=5):
+    log_dir = log_dir.split("/")[0]
     def reduced_1_row_norm(input, row_index, data_index):
         input[data_index, row_index, :] = torch.zeros(input.shape[-1])
         m = torch.norm(input[data_index, :, :], p = 'nuc').item()
@@ -189,10 +192,12 @@ def calculate_ci(model_name, log_dir, repeat=5):
     return save_path
 
 
-def prune_finetune_cifar(model_name, pretrain_dir, ci_dir):
+def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
+    model_name = cfg_network["model"]
+
 
     import re
-    cprate_str = [0.]+[0.4]*2+[0.5]*9+[0.6]*9+[0.7]*9
+    cprate_str = "[0.]+[0.4]*2+[0.5]*9+[0.6]*9+[0.7]*9"
     cprate_str_list = cprate_str.split('+')
     pat_cprate = re.compile(r'\d+\.\d*')
     pat_num = re.compile(r'\*\d+')
@@ -208,8 +213,7 @@ def prune_finetune_cifar(model_name, pretrain_dir, ci_dir):
         cprate += [float(find_cprate[0])] * num
 
     sparsity = cprate
-
-    model = eval(model_name)(sparsity=sparsity).cuda()
+    model = get_network(cfg_network, n_class, sparsity=sparsity).cuda()
 
 
     #calculate model size
@@ -219,17 +223,13 @@ def prune_finetune_cifar(model_name, pretrain_dir, ci_dir):
     print('Params: %.2f' % (params))
     print('Flops: %.2f' % (flops))
 
-
-    origin_model = eval(model_name)(sparsity=[0.] * 100).cuda()
+    origin_model = get_network(cfg_network, n_class).cuda()
     ckpt = torch.load(pretrain_dir, map_location='cuda:0')
 
-    if model_name == 'resnet110':
-        new_state_dict = OrderedDict()
-        for k, v in ckpt['state_dict'].items():
-            new_state_dict[k.replace('module.', '')] = v
-        origin_model.load_state_dict(new_state_dict)
-    else:
-        origin_model.load_state_dict(ckpt['state_dict'])
+    new_state_dict = OrderedDict()
+    for k, v in ckpt.items():
+        new_state_dict[k.replace('module.', '')] = v
+    origin_model.load_state_dict(new_state_dict)
 
     oristate_dict = origin_model.state_dict()
 
@@ -241,6 +241,7 @@ def prune_finetune_cifar(model_name, pretrain_dir, ci_dir):
         load_resnet_model(model, oristate_dict, 110, ci_dir)
     else:
         raise
+    return model
 
 
 def load_vgg_model(model, oristate_dict, ci_dir):
@@ -295,7 +296,7 @@ def load_vgg_model(model, oristate_dict, ci_dir):
 
     model.load_state_dict(state_dict)
 
-def load_resnet_model(model, oristate_dict, laye, ci_dir):
+def load_resnet_model(model, oristate_dict, layer, ci_dir):
     cfg = {
         56: [9, 9, 9],
         110: [18, 18, 18],

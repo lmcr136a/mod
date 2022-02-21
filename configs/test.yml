@@ -1,5 +1,7 @@
 data:
-  dir: CIFAR100
+  for_trainNval: CIFAR10
+  for_test: CIFAR10
+
   train:
     augmentation: null
     batch_size: 128
@@ -16,19 +18,27 @@ data:
     n_workers: 4
     pin_memory: true
     shuffle: false
+  # target_classes: [0, 1, 2, 3, 4]
 
-network:
-  backbone: resnet56
+network: 
+  model: resnet56
+  load_state: "experiments/pretrained/resnet34_cifar10.pt"
 
 run:
-  load_state: null
-  
+  seed: 9099
+  gpu_device: 1
   epoch: 200
-  figure_interval: 100
+  figure_interval: 50
   plot_interval: 10
   print_interval: 10
-  val_interval: 30
+  val_interval: 20
+
   loss: crossentropy
   optimizer:
-    lr: 1.0e-4
+    lr: 5.0e-5
     name: adam
+    momentum: 0.9
+    milestones: [5, 10,15]
+    gamma: 0.9
+    weight_decay: 0.0005
+    
