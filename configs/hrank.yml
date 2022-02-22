@@ -28,7 +28,7 @@ network:
     k: 0.49
     all_classes: False  # 기본 compress: True ,  saved_index 관련 없음    
 
-    hrank:
+    hrank: True
       # ci_path: experiments/CI_resnet56
 
 

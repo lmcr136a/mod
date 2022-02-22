@@ -1,4 +1,4 @@
-2022-02-22-02:10:12
+2022-02-22-07:30:05
 
 data_dir: ./data
 arch: resnet_56
@@ -12,7 +12,7 @@ lr_decay_step: 50,100
 momentum: 0.99
 weight_decay: 0.001
 pretrain_dir: models/pretrained/resnet56_cifar10.pt
-ci_dir: experiments/CI_resnet56
+ci_dir: experiments/chip_all_res56_cifar10/CI_resnet56
 sparsity: [0.]+[0.4]*2+[0.5]*9+[0.6]*9+[0.7]*9
-gpu: 2
+gpu: 7
 

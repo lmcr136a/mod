@@ -14,7 +14,7 @@ from utils import progress_bar
 import numpy as np
 
 parser = argparse.ArgumentParser(description='Rank extraction')
-
+print("torch.cuda.device_count()  :", torch.cuda.device_count())
 parser.add_argument(
     '--data_dir',
     type=str,
@@ -158,12 +158,8 @@ if args.resume:
     checkpoint = torch.load(args.resume, map_location='cuda:'+args.gpu)
     from collections import OrderedDict
     new_state_dict = OrderedDict()
-    if args.adjust_ckpt:
-        for k, v in checkpoint.items():
-            new_state_dict[k.replace('module.', '')] = v
-    else:
-        for k, v in checkpoint['state_dict'].items():
-            new_state_dict[k.replace('module.', '')] = v
+    for k, v in checkpoint.items():
+        new_state_dict[k.replace('module.', '')] = v
     net.load_state_dict(new_state_dict)
 
 

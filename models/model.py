@@ -6,7 +6,7 @@ def get_resnet(cfg_network, n_class, sparsity):
     model_name = cfg_network["model"]
     print("[ NETWORK ] ", model_name)
 
-    if cfg_network.get("pruning", False) and cfg_network["pruning"]["chip"]:
+    if cfg_network.get("pruning", False) and (cfg_network["pruning"].get("chip", False) or cfg_network["pruning"].get("hrank", False)) :
         return {
             "resnet56": resnet56_chip(n_class, sparsity=sparsity),
             "resnet110": resnet56_chip(n_class, sparsity=sparsity),

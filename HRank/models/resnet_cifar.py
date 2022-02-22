@@ -79,10 +79,7 @@ class ResNet(nn.Module):
                                        compress_rate=compress_rate[4 * n + 1:6 * n + 1])
         self.avgpool = nn.AdaptiveAvgPool2d(1)
 
-        if num_layers == 110:
-            self.linear = nn.Linear(64 * block.expansion, num_classes)
-        else:
-            self.fc = nn.Linear(64 * block.expansion, num_classes)
+        self.linear = nn.Linear(64 * block.expansion, num_classes)
 
         self.initialize()
 
@@ -116,10 +113,7 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
 
-        if self.num_layers == 110:
-            x = self.linear(x)
-        else:
-            x = self.fc(x)
+        x = self.linear(x)
 
         return x
 

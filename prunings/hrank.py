@@ -1,10 +1,12 @@
 from gettext import npgettext
+from operator import mod
 import os
+from pyexpat import model
 import torch
 import numpy as np
 from utils.utils import progress_bar
 
-
+from models.model import get_network
 
 
 def rank_generation(model_name, network, device, test_loader, criterion):
@@ -192,3 +194,40 @@ def rank_generation(model_name, network, device, test_loader, criterion):
                 cnt += 1
                 feature_result = torch.tensor(0.)
                 total = torch.tensor(0.)
+
+
+def hrank_main(cfg_network, n_class):
+    model_name = cfg_network["model"]
+    if model_name == "resnet56":
+        compress_rate = "[0.1]+[0.60]*35+[0.0]*2+[0.6]*6+[0.4]*3+[0.1]+[0.4]+[0.1]+[0.4]+[0.1]+[0.4]+[0.1]+[0.4]"
+    elif model_name == "resnet110":
+        compress_rate = "[0.1]+[0.40]*36+[0.40]*36+[0.4]*36"
+    elif model_name == "resnet50":
+        compress_rate = "[0.2]+[0.8]*10+[0.8]*13+[0.55]*19+[0.45]*10"
+    elif model_name == "vgg16_bn":
+        compress_rate = "[0.95]+[0.5]*6+[0.9]*4+[0.8]*2"
+    else:
+        assert 1==0
+
+    import re
+    cprate_str=compress_rate
+    cprate_str_list=cprate_str.split('+')
+    pat_cprate = re.compile(r'\d+\.\d*')
+    pat_num = re.compile(r'\*\d+')
+    cprate=[]
+    for x in cprate_str_list:
+        num=1
+        find_num=re.findall(pat_num, x)
+        if find_num:
+            assert len(find_num) == 1
+            num=int(find_num[0].replace('*',''))
+        find_cprate = re.findall(pat_cprate, x)
+        assert len(find_cprate)==1
+        cprate+=[float(find_cprate[0])]*num
+
+    compress_rate=cprate
+
+    print('==> Building model..')
+    model = get_network(cfg_network, n_class, sparsity=compress_rate).cuda()
+    return model
+

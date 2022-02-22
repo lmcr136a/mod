@@ -16,6 +16,8 @@ from utils.utils import show_test_acc, show_profile
 from dataset import get_dataloader, get_test_dataloader
 from models.model import get_network
 
+from prunings.hrank import hrank_main, rank_generation
+
 
 def run(cfg, writer):
     """
@@ -67,7 +69,7 @@ def run(cfg, writer):
         elif cfg["network"]["pruning"].get("chip", None):
             network, optimizer, criterion = chip(network, cfg["network"], dataloader.train_loader, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("hrank", None):
-            hrank()
+            network = hrank(cfg["network"], network, device, test_dataloader, criterion, n_class)
         elif cfg["network"]["pruning"].get("var", None):
             var()
 
@@ -103,9 +105,12 @@ def chip(network, cfg_network, train_loader, n_class, log_dir):
     network, optimizer, criterion = prune_finetune_cifar(cfg_network, cfg_network["load_state"], ci_dir, n_class)
     return network, optimizer, criterion
 
-def hrank():
+def hrank(cfg_network, network, device, test_loader, criterion, n_class):
     print("HRank START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-    pass
+    rank_generation(cfg_network["model"], network, device, test_loader, criterion)
+    network = hrank_main(cfg_network, n_class)
+    return network
+    
 
 
 def var():

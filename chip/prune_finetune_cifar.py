@@ -12,12 +12,6 @@ import torch.nn as nn
 import torch.utils
 import torch.backends.cudnn as cudnn
 import torch.utils.data.distributed
-import sys
-from os import path
-print(path.dirname( path.dirname( path.abspath(__file__) ) ))
-sys.path.append(path.dirname( path.dirname( path.abspath(__file__) ) ))
-
-
 from chip.models.resnet_cifar10 import resnet_56,resnet_110
 
 from chip.data import cifar10
