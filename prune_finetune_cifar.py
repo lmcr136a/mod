@@ -404,135 +404,20 @@ def main():
 
 
 
-    dataloader, n_class = get_dataloader(cfg, get_only_targets=True)
-    test_dataloader, _ = get_test_dataloader(cfg, dataloader, get_only_targets=True)
     
-    cfg, writer = configuration("../configs/chip.yml")
-    show_test_acc(test(test_dataloader, model, criterion, "cuda:2"))
+    cfg, writer = configuration("configs/chip.yml")
+    dataloader, n_class = get_dataloader(cfg, get_only_targets=True)
+
+    test_dataloader, _ = get_test_dataloader(cfg, dataloader, get_only_targets=True)
+    show_test_acc(test(test_dataloader, model, criterion, "cuda"))
     summary(model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
     show_profile(model)
-    network = trainNval(dataloader, network, cfg["run"], criterion, optimizer, "cuda:2", writer)   ## INV
-    show_test_acc(test(test_dataloader, model, criterion, "cuda:2"))
+
+    model = trainNval(dataloader, model, cfg["run"], criterion, optimizer, "cuda", writer)   ## INV
+    show_test_acc(test(test_dataloader, model, criterion, "cuda"))
 
 
 
-
-
-
-
-    # # train the model
-    # epoch = start_epoch
-    # while epoch < args.epochs:
-    #     if args.label_smooth > 0:
-    #         train_obj, train_top1_acc, train_top5_acc = train(epoch, train_loader, model, criterion_smooth,
-    #                                                           optimizer)  # , scheduler)
-    #     else:
-    #         train_obj, train_top1_acc,  train_top5_acc = train(epoch,  train_loader, model, criterion, optimizer)#, scheduler)
-    #     valid_obj, valid_top1_acc, valid_top5_acc = validate(epoch, val_loader, model, criterion, args)
-
-    #     is_best = False
-    #     if valid_top1_acc > best_top1_acc:
-    #         best_top1_acc = valid_top1_acc
-    #         is_best = True
-
-    #     utils.save_checkpoint({
-    #         'epoch': epoch,
-    #         'state_dict': model.state_dict(),
-    #         'best_top1_acc': best_top1_acc,
-    #         'optimizer' : optimizer.state_dict(),
-    #         }, is_best, args.result_dir)
-
-    #     epoch += 1
-    #     logger.info("=>Best accuracy {:.3f}".format(best_top1_acc))#
-
-
-def train(epoch, train_loader, model, criterion, optimizer, scheduler = None):
-    batch_time = utils.AverageMeter('Time', ':6.3f')
-    data_time = utils.AverageMeter('Data', ':6.3f')
-    losses = utils.AverageMeter('Loss', ':.4e')
-    top1 = utils.AverageMeter('Acc@1', ':6.2f')
-    top5 = utils.AverageMeter('Acc@5', ':6.2f')
-
-    model.train()
-    end = time.time()
-
-    for param_group in optimizer.param_groups:
-        cur_lr = param_group['lr']
-    logger.info('learning_rate: ' + str(cur_lr))
-
-    num_iter = len(train_loader)
-    for i, (images, target) in enumerate(train_loader):
-        data_time.update(time.time() - end)
-        images = images.cuda()
-        target = target.cuda()
-
-        adjust_learning_rate(optimizer, epoch, i, num_iter)
-
-        # compute outputy
-        logits = model(images)
-        loss = criterion(logits, target)
-
-        # measure accuracy and record loss
-        prec1, prec5 = utils.accuracy(logits, target, topk=(1, 5))
-        n = images.size(0)
-        losses.update(loss.item(), n)   #accumulated loss
-        top1.update(prec1.item(), n)
-        top5.update(prec5.item(), n)
-
-        # compute gradient and do SGD step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
-
-        if i % print_freq == 0:
-            logger.info(
-                'Epoch[{0}]({1}/{2}): '
-                'Loss {loss.avg:.4f} '
-                'Prec@1(1,5) {top1.avg:.2f}, {top5.avg:.2f}'.format(
-                    epoch, i, num_iter, loss=losses,
-                    top1=top1, top5=top5))
-
-    # scheduler.step()
-
-    return losses.avg, top1.avg, top5.avg
-
-def validate(epoch, val_loader, model, criterion, args):
-    batch_time = utils.AverageMeter('Time', ':6.3f')
-    losses = utils.AverageMeter('Loss', ':.4e')
-    top1 = utils.AverageMeter('Acc@1', ':6.2f')
-    top5 = utils.AverageMeter('Acc@5', ':6.2f')
-
-    # switch to evaluation mode
-    model.eval()
-    with torch.no_grad():
-        end = time.time()
-        for i, (images, target) in enumerate(val_loader):
-            images = images.cuda()
-            target = target.cuda()
-
-            # compute output
-            logits = model(images)
-            loss = criterion(logits, target)
-
-            # measure accuracy and record loss
-            pred1, pred5 = utils.accuracy(logits, target, topk=(1, 5))
-            n = images.size(0)
-            losses.update(loss.item(), n)
-            top1.update(pred1[0], n)
-            top5.update(pred5[0], n)
-
-            # measure elapsed time
-            batch_time.update(time.time() - end)
-            end = time.time()
-
-        logger.info(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
-              .format(top1=top1, top5=top5))
-
-    return losses.avg, top1.avg, top5.avg
 
 
 if __name__ == '__main__':

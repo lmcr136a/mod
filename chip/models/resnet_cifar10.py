@@ -121,10 +121,8 @@ class ResNet(nn.Module):
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
-        if self.num_layer == 56:
-            self.fc = nn.Linear(64 * BasicBlock.expansion, num_classes)
-        else:
-            self.linear = nn.Linear(64 * BasicBlock.expansion, num_classes)
+
+        self.linear = nn.Linear(64 * BasicBlock.expansion, num_classes)
 
 
     def _make_layer(self, block, blocks_num, stride):
@@ -155,10 +153,7 @@ class ResNet(nn.Module):
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
 
-        if self.num_layer == 56:
-            x = self.fc(x)
-        else:
-            x = self.linear(x)
+        x = self.linear(x)
 
         return x
 

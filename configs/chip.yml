@@ -18,7 +18,7 @@ data:
     n_workers: 4
     pin_memory: true
     shuffle: false
-  # target_classes: [0, 1, 2, 3, 4]
+  target_classes: [0, 1, 2, 3, 4]
 
 network: 
   model: resnet56
@@ -29,7 +29,7 @@ network:
     all_classes: False  # 기본 compress: True ,  saved_index 관련 없음    
 
     chip:
-      # ci_path: experiments/CI_resnet56
+      ci_path: #experiments/CI_resnet56
 
 
 run:
@@ -43,10 +43,10 @@ run:
 
   loss: crossentropy
   optimizer:
-    lr: 1.0e-4
-    name: adam
+    lr: 1.0e-2
+    name: sgd
     momentum: 0.9
     milestones: [5, 10,15]
     gamma: 0.9
-    weight_decay: 0.0005
+    weight_decay: 0.005
     

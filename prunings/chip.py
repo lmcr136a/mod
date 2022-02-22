@@ -8,6 +8,7 @@ import time
 from thop import profile
 from collections import OrderedDict
 from models.model import get_network
+import chip.utils as utils
 
 conv_index = torch.tensor(1)
 
@@ -193,8 +194,133 @@ def calculate_ci(model_name, log_dir, repeat=5):
 
 
 def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
-    model_name = cfg_network["model"]
+    name_base = ""
+    def load_vgg_model(model, oristate_dict):
+        state_dict = model.state_dict()
+        last_select_index = None #Conv index selected in the previous layer
 
+        cnt=0
+        prefix = ci_dir+'/ci_conv'
+        subfix = ".npy"
+        for name, module in model.named_modules():
+            name = name.replace('module.', '')
+
+            if isinstance(module, nn.Conv2d):
+
+                cnt+=1
+                oriweight = oristate_dict[name + '.weight']
+                curweight = state_dict[name_base+name + '.weight']
+                orifilter_num = oriweight.size(0)
+                currentfilter_num = curweight.size(0)
+
+                if orifilter_num != currentfilter_num:
+
+                    cov_id = cnt
+                    print('loading ci from: ' + prefix + str(cov_id) + subfix)
+                    ci = np.load(prefix + str(cov_id) + subfix)
+                    select_index = np.argsort(ci)[orifilter_num-currentfilter_num:]  # preserved filter id
+                    select_index.sort()
+
+                    if last_select_index is not None:
+                        for index_i, i in enumerate(select_index):
+                            for index_j, j in enumerate(last_select_index):
+                                state_dict[name_base+name + '.weight'][index_i][index_j] = \
+                                    oristate_dict[name + '.weight'][i][j]
+                    else:
+                        for index_i, i in enumerate(select_index):
+                            state_dict[name_base+name + '.weight'][index_i] = \
+                                    oristate_dict[name + '.weight'][i]
+
+                    last_select_index = select_index
+
+                elif last_select_index is not None:
+                    for i in range(orifilter_num):
+                        for index_j, j in enumerate(last_select_index):
+                            state_dict[name_base+name + '.weight'][i][index_j] = \
+                                oristate_dict[name + '.weight'][i][j]
+                else:
+                    state_dict[name_base+name + '.weight'] = oriweight
+                    last_select_index = None
+
+        model.load_state_dict(state_dict)
+
+    def load_resnet_model(model, oristate_dict, layer):
+        cfg = {
+            56: [9, 9, 9],
+            110: [18, 18, 18],
+        }
+
+        state_dict = model.state_dict()
+
+        current_cfg = cfg[layer]
+        last_select_index = None
+
+        all_conv_weight = []
+
+        prefix = ci_dir+'/ci_conv'
+        subfix = ".npy"
+
+        cnt=1
+        for layer, num in enumerate(current_cfg):
+            layer_name = 'layer' + str(layer + 1) + '.'
+            for k in range(num):
+                for l in range(2):
+
+                    cnt+=1
+                    cov_id=cnt
+
+                    conv_name = layer_name + str(k) + '.conv' + str(l + 1)
+                    conv_weight_name = conv_name + '.weight'
+                    all_conv_weight.append(conv_weight_name)
+                    oriweight = oristate_dict[conv_weight_name]
+                    curweight =state_dict[name_base+conv_weight_name]
+                    orifilter_num = oriweight.size(0)
+                    currentfilter_num = curweight.size(0)
+
+                    if orifilter_num != currentfilter_num:
+                        print('loading ci from: ' + prefix + str(cov_id) + subfix)
+                        ci = np.load(prefix + str(cov_id) + subfix)
+                        select_index = np.argsort(ci)[orifilter_num - currentfilter_num:]  # preserved filter id
+                        select_index.sort()
+
+                        if last_select_index is not None:
+                            for index_i, i in enumerate(select_index):
+                                for index_j, j in enumerate(last_select_index):
+                                    state_dict[name_base+conv_weight_name][index_i][index_j] = \
+                                        oristate_dict[conv_weight_name][i][j]
+                        else:
+                            for index_i, i in enumerate(select_index):
+                                state_dict[name_base+conv_weight_name][index_i] = \
+                                    oristate_dict[conv_weight_name][i]
+
+                        last_select_index = select_index
+
+                    elif last_select_index is not None:
+                        for index_i in range(orifilter_num):
+                            for index_j, j in enumerate(last_select_index):
+                                state_dict[name_base+conv_weight_name][index_i][index_j] = \
+                                    oristate_dict[conv_weight_name][index_i][j]
+                        last_select_index = None
+
+                    else:
+                        state_dict[name_base+conv_weight_name] = oriweight
+                        last_select_index = None
+
+        for name, module in model.named_modules():
+            name = name.replace('module.', '')
+
+            if isinstance(module, nn.Conv2d):
+                conv_name = name + '.weight'
+                if 'shortcut' in name:
+                    continue
+                if conv_name not in all_conv_weight:
+                    state_dict[name_base+conv_name] = oristate_dict[conv_name]
+
+            elif isinstance(module, nn.Linear):
+                state_dict[name_base+name + '.weight'] = oristate_dict[name + '.weight']
+                state_dict[name_base+name + '.bias'] = oristate_dict[name + '.bias']
+
+        model.load_state_dict(state_dict)
 
     import re
     cprate_str = "[0.]+[0.4]*2+[0.5]*9+[0.6]*9+[0.7]*9"
@@ -213,8 +339,11 @@ def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
         cprate += [float(find_cprate[0])] * num
 
     sparsity = cprate
-    model = get_network(cfg_network, n_class, sparsity=sparsity).cuda()
 
+    # load model
+    print('sparsity:' + str(sparsity))
+    print('==> Building model..')
+    model = get_network(cfg_network, n_class, sparsity=sparsity).cuda()
 
     #calculate model size
     input_image_size=32
@@ -223,155 +352,46 @@ def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
     print('Params: %.2f' % (params))
     print('Flops: %.2f' % (flops))
 
-    origin_model = get_network(cfg_network, n_class).cuda()
+
+    criterion = nn.CrossEntropyLoss()
+    criterion = criterion.cuda()
+    criterion_smooth = utils.CrossEntropyLabelSmooth(n_class, 0)
+    criterion_smooth = criterion_smooth.cuda()
+
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.005)
+    lr_decay_step = list(map(int, "50,100".split(',')))
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_decay_step, gamma=0.1)
+
+    start_epoch = 0
+    best_top1_acc= 0
+
+    # load the checkpoint if it exists
+
+    print('resuming from pretrain model')
+    
+    origin_model = get_network(cfg_network, n_class, sparsity=[0.] * 100).cuda()
     ckpt = torch.load(pretrain_dir, map_location='cuda:0')
 
-    new_state_dict = OrderedDict()
-    for k, v in ckpt.items():
-        new_state_dict[k.replace('module.', '')] = v
-    origin_model.load_state_dict(new_state_dict)
+    if cfg_network["model"] == 'resnet_110':
+        new_state_dict = OrderedDict()
+        for k, v in ckpt.items():
+            new_state_dict[k.replace('module.', '')] = v
+        origin_model.load_state_dict(new_state_dict)
+    else:
+        origin_model.load_state_dict(ckpt)
 
     oristate_dict = origin_model.state_dict()
 
-    if model_name == 'vgg_16_bn':
-        load_vgg_model(model, oristate_dict, ci_dir)
-    elif model_name == 'resnet56':
-        load_resnet_model(model, oristate_dict, 56, ci_dir)
-    elif model_name == 'resnet110':
-        load_resnet_model(model, oristate_dict, 110, ci_dir)
+    if cfg_network["model"] == 'vgg16_bn':
+        load_vgg_model(model, oristate_dict)
+    elif cfg_network["model"] == 'resnet56':
+        load_resnet_model(model, oristate_dict, 56)
+    elif cfg_network["model"] == 'resnet110':
+        load_resnet_model(model, oristate_dict, 110)
     else:
         raise
-    return model
+    
+    return model, optimizer, criterion
 
 
-def load_vgg_model(model, oristate_dict, ci_dir):
-    # name_base = "module."
-    name_base = ""
-
-    state_dict = model.state_dict()
-    last_select_index = None #Conv index selected in the previous layer
-
-    cnt=0
-    prefix = ci_dir+'/ci_conv'
-    subfix = ".npy"
-    for name, module in model.named_modules():
-        name = name.replace('module.', '')
-
-        if isinstance(module, nn.Conv2d):
-
-            cnt+=1
-            oriweight = oristate_dict[name + '.weight']
-            curweight = state_dict[name_base+name + '.weight']
-            orifilter_num = oriweight.size(0)
-            currentfilter_num = curweight.size(0)
-
-            if orifilter_num != currentfilter_num:
-
-                cov_id = cnt
-                print('loading ci from: ' + prefix + str(cov_id) + subfix)
-                ci = np.load(prefix + str(cov_id) + subfix)
-                select_index = np.argsort(ci)[orifilter_num-currentfilter_num:]  # preserved filter id
-                select_index.sort()
-
-                if last_select_index is not None:
-                    for index_i, i in enumerate(select_index):
-                        for index_j, j in enumerate(last_select_index):
-                            state_dict[name_base+name + '.weight'][index_i][index_j] = \
-                                oristate_dict[name + '.weight'][i][j]
-                else:
-                    for index_i, i in enumerate(select_index):
-                       state_dict[name_base+name + '.weight'][index_i] = \
-                            oristate_dict[name + '.weight'][i]
-
-                last_select_index = select_index
-
-            elif last_select_index is not None:
-                for i in range(orifilter_num):
-                    for index_j, j in enumerate(last_select_index):
-                        state_dict[name_base+name + '.weight'][i][index_j] = \
-                            oristate_dict[name + '.weight'][i][j]
-            else:
-                state_dict[name_base+name + '.weight'] = oriweight
-                last_select_index = None
-
-    model.load_state_dict(state_dict)
-
-def load_resnet_model(model, oristate_dict, layer, ci_dir):
-    cfg = {
-        56: [9, 9, 9],
-        110: [18, 18, 18],
-    }
-    # name_base = "module."
-    name_base = ""
-
-    state_dict = model.state_dict()
-
-    current_cfg = cfg[layer]
-    last_select_index = None
-
-    all_conv_weight = []
-
-    prefix = ci_dir+'/ci_conv'
-    subfix = ".npy"
-
-    cnt=1
-    for layer, num in enumerate(current_cfg):
-        layer_name = 'layer' + str(layer + 1) + '.'
-        for k in range(num):
-            for l in range(2):
-
-                cnt+=1
-                cov_id=cnt
-
-                conv_name = layer_name + str(k) + '.conv' + str(l + 1)
-                conv_weight_name = conv_name + '.weight'
-                all_conv_weight.append(conv_weight_name)
-                oriweight = oristate_dict[conv_weight_name]
-                curweight =state_dict[name_base+conv_weight_name]
-                orifilter_num = oriweight.size(0)
-                currentfilter_num = curweight.size(0)
-
-                if orifilter_num != currentfilter_num:
-                    print('loading ci from: ' + prefix + str(cov_id) + subfix)
-                    ci = np.load(prefix + str(cov_id) + subfix)
-                    select_index = np.argsort(ci)[orifilter_num - currentfilter_num:]  # preserved filter id
-                    select_index.sort()
-
-                    if last_select_index is not None:
-                        for index_i, i in enumerate(select_index):
-                            for index_j, j in enumerate(last_select_index):
-                                state_dict[name_base+conv_weight_name][index_i][index_j] = \
-                                    oristate_dict[conv_weight_name][i][j]
-                    else:
-                        for index_i, i in enumerate(select_index):
-                            state_dict[name_base+conv_weight_name][index_i] = \
-                                oristate_dict[conv_weight_name][i]
-
-                    last_select_index = select_index
-
-                elif last_select_index is not None:
-                    for index_i in range(orifilter_num):
-                        for index_j, j in enumerate(last_select_index):
-                            state_dict[name_base+conv_weight_name][index_i][index_j] = \
-                                oristate_dict[conv_weight_name][index_i][j]
-                    last_select_index = None
-
-                else:
-                    state_dict[name_base+conv_weight_name] = oriweight
-                    last_select_index = None
-
-    for name, module in model.named_modules():
-        name = name.replace('module.', '')
-
-        if isinstance(module, nn.Conv2d):
-            conv_name = name + '.weight'
-            if 'shortcut' in name:
-                continue
-            if conv_name not in all_conv_weight:
-                state_dict[name_base+conv_name] = oristate_dict[conv_name]
-
-        elif isinstance(module, nn.Linear):
-            state_dict[name_base+name + '.weight'] = oristate_dict[name + '.weight']
-            state_dict[name_base+name + '.bias'] = oristate_dict[name + '.bias']
-
-    model.load_state_dict(state_dict)

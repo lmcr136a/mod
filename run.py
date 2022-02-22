@@ -65,7 +65,7 @@ def run(cfg, writer):
         if cfg["network"]["pruning"].get("lasso", None):
             lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("chip", None):
-            network = chip(network, cfg["network"], dataloader.train_loader, n_class, writer.log_dir)
+            network, optimizer, criterion = chip(network, cfg["network"], dataloader.train_loader, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("hrank", None):
             hrank()
         elif cfg["network"]["pruning"].get("var", None):
@@ -81,6 +81,7 @@ def run(cfg, writer):
     
 
 def lasso(cfg, dataloader, network, optimizer, criterion, n_class, log_dir):
+    print("LASSO START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
     agent = AssembleNetResNet(cfg["run"], dataloader, network, optimizer, criterion, n_class)   ## INV
     agent.init_graph(pretrained=False)
     if cfg["network"]["pruning"]["all_classes"]:
@@ -92,19 +93,23 @@ def lasso(cfg, dataloader, network, optimizer, criterion, n_class, log_dir):
 
 
 def chip(network, cfg_network, train_loader, n_class, log_dir):
+    print("CHIP START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
     if cfg_network['pruning']["chip"].get("ci_path", None):
+        ci_dir = cfg_network['pruning']["chip"]["ci_path"]
+    else:
+        print("CAL CI START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
         calculate_feature_map(network, cfg_network["model"], train_loader, log_dir=log_dir)
         ci_dir = calculate_ci(cfg_network["model"], log_dir)
-    else:
-        ci_dir = cfg_network["chip"]["ci_path"]
-    network = prune_finetune_cifar(cfg_network, cfg_network["load_state"], ci_dir, n_class)
-    return network
+    network, optimizer, criterion = prune_finetune_cifar(cfg_network, cfg_network["load_state"], ci_dir, n_class)
+    return network, optimizer, criterion
 
 def hrank():
+    print("HRank START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
     pass
 
 
 def var():
+    print("GAL START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
     pass
 
 
@@ -253,7 +258,7 @@ def get_optimizer(cfg_run, network):
     name = cfg_run["optimizer"]["name"]
     if name == "adam":
         return optim.Adam(network.parameters(), lr=cfg_run["optimizer"]["lr"])
-    if name == "SGD":
+    if name == "sgd":
         return optim.SGD(network.parameters(), cfg_run["optimizer"]["lr"],
                                 momentum=cfg_run["optimizer"]["momentum"],
                                 weight_decay=cfg_run["optimizer"]["weight_decay"])
