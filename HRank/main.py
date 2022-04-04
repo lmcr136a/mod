@@ -10,10 +10,14 @@ import os
 import argparse
 
 from data import imagenet
-from models import *
+from models import resnet_56, resnet_50, resnet_110, vgg_16_bn
 from utils import progress_bar
-from mask import *
+from mask import mask_resnet_56, mask_resnet_50, mask_densenet_40, mask_googlenet, mask_resnet_110, mask_vgg_16_bn
 import utils
+import torch.nn as nn
+
+from torchsummaryX import summary
+
 
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
@@ -92,6 +96,47 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+
+def show_nonzero_params_num(model):
+    num_param = 0
+    for p in model.parameters():
+        for channel in p.data:
+            if p.requires_grad and channel.shape and not torch.all(channel == 0):
+                num_param += channel.numel()
+    return num_param
+
+import sys
+import datetime
+from pytz import timezone, utc
+
+def num_(number):
+    if len(str(number)) == 1:
+        return f"0{number}"
+    else:
+        return f"{number}"
+
+
+print(f"\n\n\n                     START LOGGING, GPU {args.gpu}\n\n")
+KST = timezone('Asia/Seoul')
+now = datetime.datetime.utcnow()
+t = utc.localize(now).astimezone(KST)
+
+args.job_dir = f'../experiments/HRank_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
+
+if not os.path.isdir(args.job_dir):
+    os.makedirs(args.job_dir)
+
+
+f = open(args.job_dir+"/log.txt", 'w')
+sys.stdout = f
+
+
+
+
+
+
+
+
 os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
 if len(args.gpu)==1:
@@ -160,6 +205,7 @@ print_logger.info('==> Building model..')
 net = eval(args.arch)(compress_rate=compress_rate)
 net = net.to(device)
 
+
 if len(args.gpu)>1 and torch.cuda.is_available():
     device_id = []
     for i in range((len(args.gpu) + 1) // 2):
@@ -167,7 +213,9 @@ if len(args.gpu)>1 and torch.cuda.is_available():
     net = torch.nn.DataParallel(net, device_ids=device_id)
 
 cudnn.benchmark = True
-print(net)
+# print(net.layer1[1].conv2.weight.data.shape)
+num_params_before_pruning = show_nonzero_params_num(net)
+print("NUM OF PARAMS BEFORE PRUNING: ", num_params_before_pruning)
 
 if len(args.gpu)>1:
     m = eval('mask_'+args.arch)(model=net, compress_rate=net.module.compress_rate, job_dir=args.job_dir, device=device)
@@ -203,9 +251,9 @@ def train(epoch, cov_id, optimizer, scheduler, pruning=True):
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
-            progress_bar(batch_idx,len(trainloader),
-                         'Cov: %d | Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                         % (cov_id, train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+            # progress_bar(batch_idx,len(trainloader),
+            #              'Cov: %d | Loss: %.3f | Acc: %.3f%% (%d/%d)'
+            #              % (cov_id, train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
 def test(epoch, cov_id, optimizer, scheduler):
     top1 = utils.AverageMeter()
@@ -251,6 +299,7 @@ if len(args.gpu)>1:
 else:
     convcfg = net.covcfg
 
+
 param_per_cov_dic={
     'vgg_16_bn': 4,
     'densenet_40': 3,
@@ -282,7 +331,7 @@ for cov_id in range(args.start_cov, len(convcfg)):
         if args.arch == 'resnet_50':
             tmp_ckpt = pruned_checkpoint
         else:
-            tmp_ckpt = pruned_checkpoint['state_dict']
+            tmp_ckpt = pruned_checkpoint
 
         if len(args.gpu) > 1:
             for k, v in tmp_ckpt.items():
@@ -299,17 +348,23 @@ for cov_id in range(args.start_cov, len(convcfg)):
                 continue
             else:
                 pruned_checkpoint = torch.load(
-                    args.job_dir + "/pruned_checkpoint/" + args.arch + "_cov" + str(skip_list[skip_list.index(cov_id+1)-1]) + '.pt')
+                    args.job_dir + "/pruned_checkpoint/" + args.arch + "_cov" + str(skip_list[skip_list.index(cov_id+1)-1]) + '.pt', map_location='cuda:0')
                 net.load_state_dict(pruned_checkpoint['state_dict'])
         else:
             if len(args.gpu) == 1:
-                pruned_checkpoint = torch.load(args.job_dir + "/pruned_checkpoint/" + args.arch + "_cov" + str(cov_id) + '.pt', map_location='cuda:' + args.gpu)
+                pruned_checkpoint = torch.load(args.job_dir + "/pruned_checkpoint/" + args.arch + "_cov" + str(cov_id) + '.pt', map_location='cuda:0')
             else:
-                pruned_checkpoint = torch.load(args.job_dir + "/pruned_checkpoint/" + args.arch + "_cov" + str(cov_id) + '.pt')
+                pruned_checkpoint = torch.load(args.job_dir + "/pruned_checkpoint/" + args.arch + "_cov" + str(cov_id) + '.pt', map_location='cuda:0')
             net.load_state_dict(pruned_checkpoint['state_dict'])
 
     best_acc=0.
-    for epoch in range(0, args.epochs):
+    for epoch in range(0, 3):
         train(epoch, cov_id + 1, optimizer, scheduler)
         scheduler.step()
         test(epoch, cov_id + 1, optimizer, scheduler)
+    
+    a = show_nonzero_params_num(net)
+    print(a)
+
+a = show_nonzero_params_num(net)
+print("NUM OF PARAMS AFTER PRUNING: ", a, f"{a/num_params_before_pruning}% pruned")

@@ -1,0 +1,31 @@
+2022-02-22-23:29:26
+
+gpus: [6]
+dataset: cifar10
+data_dir: /hdd1/hdd_A/data/cifar10
+job_dir: experiment/resnet/lambda_0.6_miu_1_test
+teacher_dir: /home/workspace/nh/mod/models/pretrained/resnet56_cifar10.pt
+reset: False
+resume: None
+refine: None
+arch: resnet
+target_model: gal_05
+student_model: resnet_56_sparse
+teacher_model: resnet_56
+num_epochs: 100
+train_batch_size: 128
+eval_batch_size: 100
+momentum: 0.9
+lr: 0.01
+lr_decay_step: 30
+mask_step: 200
+weight_decay: 0.0002
+miu: 1.0
+sparse_lambda: 0.6
+random: False
+pruned: False
+thre: 0.0
+keep_grad: False
+print_freq: 200
+test_only: False
+

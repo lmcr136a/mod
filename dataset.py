@@ -36,9 +36,11 @@ def get_dataloader(cfg, for_test=False, get_only_targets=False):
 def get_test_dataloader(cfg, dataloader, get_only_targets=False):
     cfg_data = cfg["data"]
     if cfg_data["for_test"] == cfg_data["for_trainNval"]:
-        return dataloader, 0
+        pass
     else:
-        return get_dataloader(cfg, for_test=True, get_only_targets=get_only_targets)
+        test_loader, _ = get_dataloader(cfg, for_test=True, get_only_targets=get_only_targets)
+        dataloader.valid_loader = test_loader.test_loader
+        dataloader.test_loader = test_loader.test_loader
 
 
 class CifarDataLoader:
@@ -124,23 +126,10 @@ class InversionDataLoader:
         self.config = config["run"]
         self.logger = logging.getLogger(f"Inversion Cifar{class_num}DataLoader")
 
-
-        data_transformer = transforms.Compose([transforms.ToTensor()])
-        if config["network"]["model"] == "resnet20":
-            if class_num == 10:
-                data_path = f"./data/inversion/cifar10_r20_196/"
-            elif class_num == 100:
-                data_path = f"./data/inversion/cifar100_r20_196/"
-            else:
-                raise ValueError('check class num in cifar dataloader')
-        elif config["network"]["model"] == "resnet34":
-            if class_num == 10:
-                data_path = f"./data/inversion/cifar10_r34_196/"
-            elif class_num == 100:
-                data_path = f"./data/inversion/cifar100_r34_196/"
-            else:
-                raise ValueError('check class num in cifar dataloader')
-
+        if "resnet" in config["network"]["model"]:
+            data_path = f'./data/inversion/{config["data"]["for_test"].lower()}_r{config["network"]["model"][-2:]}_196/'
+        else:
+            pass
         
         data_transformer = transforms.Compose([transforms.ToTensor()])
         train_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)

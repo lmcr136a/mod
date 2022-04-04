@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 def adapt_channel(sparsity, num_layers):
-
     if num_layers==56:
         stage_repeat = [9, 9, 9]
         stage_out_channel = [16] + [16] * 9 + [32] * 9 + [64] * 9
@@ -14,7 +13,7 @@ def adapt_channel(sparsity, num_layers):
     stage_oup_cprate = []
     stage_oup_cprate += [sparsity[0]]
     for i in range(len(stage_repeat)-1):
-        stage_oup_cprate += [sparsity[i+1]] * stage_repeat[i]
+        stage_oup_cprate += [sparsity[i+1]] * stage_repeat[i]  # "[0.]+[0.4]*2+[0.4]*9+[0.5]*9+[0.5]*9"
     stage_oup_cprate +=[0.] * stage_repeat[-1]
     mid_cprate = sparsity[len(stage_repeat):]
 
@@ -98,6 +97,8 @@ class ResNet(nn.Module):
         n = (num_layers - 2) // 6
 
         self.num_layer = num_layers
+        if not sparsity:
+            sparsity = [0.]*100
         self.overall_channel, self.mid_channel = adapt_channel(sparsity, num_layers)
 
         self.layer_num = 0

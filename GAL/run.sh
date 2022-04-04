@@ -1,12 +1,24 @@
-resnet(){
-PRETRAINED_RESNET=/hdd1/hdd_B/ycq/pretrained/resnet_56.pt
+resnet56(){
+PRETRAINED_RESNET=/home/workspace/nh/mod/models/pretrained/resnet56_cifar10.pt
 MIU=1
 LAMBDA=0.6
 python main.py \
---teacher_dir $PRETRAINED_RESNET \
+--teacher_dir $PRETRAINED_RESNET --title r56\
 --arch resnet --teacher_model resnet_56 --student_model resnet_56_sparse \
 --lambda $LAMBDA --miu $MIU \
---job_dir 'experiment/resnet/lambda_'$LAMBDA'_miu_'$MIU'_test' --gpus 2 \
+--job_dir 'experiment/resnet/lambda_'$LAMBDA'_miu_'$MIU'_test' --gpus 6 \
+--data_dir /hdd1/hdd_A/data/cifar10
+}
+
+resnet110(){
+PRETRAINED_RESNET=/home/workspace/nh/mod/models/pretrained/resnet110_cifar10.pt
+MIU=1
+LAMBDA=0.6
+python main.py \
+--teacher_dir $PRETRAINED_RESNET --title r110\
+--arch resnet --teacher_model resnet_110 --student_model resnet_110_sparse \
+--lambda $LAMBDA --miu $MIU \
+--job_dir 'experiment/resnet/lambda_'$LAMBDA'_miu_'$MIU'_test' --gpus 6 \
 --data_dir /hdd1/hdd_A/data/cifar10
 }
 
@@ -48,18 +60,21 @@ python main.py \
 
 finetune(){
 ARCH=resnet
+TITLE=finetune
 python finetune.py \
 --arch $ARCH --lr 1e-5 \
---refine experiment/$ARCH/lambda_0.8_miu_1/resnet_pruned_11.pt \
---job_dir experiment/$ARCH/ft_lambda_0.8_miu_1_lr_1e-5/ \
+--title $TITLE \
+--refine experiments/r56/resnet_pruned_8.pt \
+--job_dir experiment/$ARCH/$TITLE/ \
 --pruned 
 }
 
 
 # Training
 # vgg;
-resnet;
+# resnet56;
+# resnet110;
 # googlenet;
 # densenet;
 # Fine-tuning
-# finetune;
+finetune;

@@ -123,7 +123,10 @@ class AssembleNetResNet(BaseAgent):
 
                 if m.downsample is not None:
                     self.named_modules_list['{}.downsample'.format(i)] = m.downsample
-                    self.named_conv_list['{}.downsample'.format(i)] = m.downsample[0]
+                    if len(m.downsample) > 0:
+                        self.named_conv_list['{}.downsample'.format(i)] = m.downsample[0]
+                    else:
+                        self.named_conv_list['{}.downsample'.format(i)] = m.downsample
             else:
                 self.named_modules_list['{}'.format(i)] = m
                 if isinstance(m, torch.nn.Conv2d):
@@ -231,7 +234,7 @@ class AssembleNetResNet(BaseAgent):
                 # second conv in residual block
                 x = m.conv2(x)
                 self.original_conv_output['{}.conv2'.format(i)] = x
-                x = torch.relu(m.bn2(x) + m.shortcut(shortcut))
+                x = torch.relu(m.bn2(x) + m.downsample(shortcut))
                 assert torch.all(x == m(shortcut))
 
             elif isinstance(m, models.resnet_imagenet.Bottleneck):
@@ -250,9 +253,16 @@ class AssembleNetResNet(BaseAgent):
                 x = m.relu(m.bn3(x))
 
                 if m.downsample is not None:
-                    shortcut = m.downsample[0](shortcut)
+                    if len(m.downsample) > 0:
+                        shortcut = m.downsample[0](shortcut)
+                    else:
+                        shortcut = m.downsample(shortcut)
+                    
                     self.original_conv_output['{}.downsample'.format(i)] = shortcut
-                    shortcut = m.downsample[1](shortcut)
+                    if len(m.downsample) > 1:
+                        shortcut = m.downsample[1](shortcut)
+                    else:
+                        pass
                     x = x + shortcut
                     x = m.relu(x)
                 else:

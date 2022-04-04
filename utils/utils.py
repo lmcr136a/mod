@@ -1,5 +1,5 @@
 import time
-import datetime
+
 import os
 import sys
 import torch
@@ -7,21 +7,41 @@ import shutil
 import yaml
 from torch.utils.tensorboard import SummaryWriter
 from thop import profile
+import datetime
+from pytz import timezone, utc
 
-def configuration(config):
+
+
+def num_(number):
+    if len(str(number)) == 1:
+        return f"0{number}"
+    else:
+        return f"{number}"
+
+
+
+
+def configuration(config, force_gpu):
     """
     input: path of .yml file
     output: dictionary of configurations
     """
-    print("\n\n\n                               START LOGGING\n\n")
-    tb_dir = f'experiments/{time.strftime("%m%d_%H%M%S", time.localtime())}_{config.split("/")[1].split(".")[0]}'
+
+    with open("configs/"+config, encoding="utf-8") as fp:
+        cfg = yaml.load(fp, Loader=yaml.FullLoader)        
+
+    if force_gpu:
+        cfg['run']['gpu_device']=force_gpu
+    print(f"\n{'*'*10}START LOGGING, GPU: {cfg['run']['gpu_device']} {'*'*10}\n")
+    KST = timezone('Asia/Seoul')
+    now = datetime.datetime.utcnow()
+    t = utc.localize(now).astimezone(KST)
+    tb_dir = f'experiments/___{config.split(".")[0]}_{cfg["network"]["model"]}_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
     writer = SummaryWriter(tb_dir)
     f = open(tb_dir+"/log.txt", 'w')
     sys.stdout = f
-    with open(config, encoding="utf-8") as fp:
-        cfg = yaml.load(fp, Loader=yaml.FullLoader)
-        
-    with open(tb_dir+"/"+config.split("/")[1], "w") as f:
+
+    with open(tb_dir+"/"+config, "w") as f:
         yaml.dump(cfg, f)
 
     return cfg, writer

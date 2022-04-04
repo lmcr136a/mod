@@ -1,33 +1,52 @@
 from .resnet_cifar import resnet20, resnet32, resnet44, resnet56, resnet110
-from .resnet_chip import resnet56_chip, resnet110_chip
-from .resnet_imagenet import resnet18, resnet34, resnet50, resnet101, resnet152
+from .resnet_chip_imagenet import resnet50_chip, resnet34_chip
+from .resnet_hrank_imagenet import resnet34_hrank, resnet50_hrank
+from .resnet_imagenet import resnet18, resnet34, resnet50, resnet101
+from .resnet_chip import resnet56_chip
+from .resnet_hrank import resnet56_hrank
+from .resnet_gal import resnet56_gal
+from .vgg_chip import vgg_16_bn_chip
+from .vgg_gal import vgg_16_bn_gal
+from .vgg_hrank import vgg_16_bn_hrank
+# from .resnet_gal_imagenet import resnet34_gal, resnet50_gal
 
 def get_resnet(cfg_network, n_class, sparsity):
     model_name = cfg_network["model"]
+
+    if cfg_network.get("pruning", False) and (cfg_network["pruning"].get("chip", False) or cfg_network["pruning"].get("hrank", False) or cfg_network["pruning"].get("gal", False)) :
+        if cfg_network["pruning"].get("gal", None):
+            model_name = model_name +"_gal"
+            print("[ NETWORK ] ", model_name)
+            return eval(model_name)(num_classes=n_class)
+
+        elif cfg_network["pruning"].get("hrank", None):
+            model_name = model_name +"_hrank"
+            print("[ NETWORK ] ", model_name)
+            return eval(model_name)(num_classes=n_class, compress_rate=sparsity)
+
+        elif cfg_network["pruning"].get("chip", None):
+            model_name = model_name +"_chip"
+            print("[ NETWORK ] ", model_name)
+            return eval(model_name)(num_classes=n_class, sparsity=sparsity)
+
     print("[ NETWORK ] ", model_name)
-
-    if cfg_network.get("pruning", False) and (cfg_network["pruning"].get("chip", False) or cfg_network["pruning"].get("hrank", False)) :
-        return {
-            "resnet56": resnet56_chip(n_class, sparsity=sparsity),
-            "resnet110": resnet56_chip(n_class, sparsity=sparsity),
-
-        }[model_name]
     return {
         "resnet20": resnet20(n_class),
         "resnet32": resnet32(n_class),
         "resnet44": resnet44(n_class),
-        "resnet56": resnet56(n_class),
+        "resnet56": resnet56_chip(num_classes=n_class, sparsity=sparsity),
         "resnet110": resnet110(n_class),
         
         "resnet18": resnet18(n_class),
         "resnet34": resnet34(n_class),
         "resnet50": resnet50(n_class),
         "resnet101": resnet101(n_class),
-        "resnet152": resnet152(n_class),
     }[model_name]
 
 
-def get_network(cfg_network, n_class, sparsity=[0.]*100):
+def get_network(cfg_network, n_class, sparsity=None):
     model = get_resnet(cfg_network, n_class, sparsity)
+
     print("[MODEL] Number of parameters : ", sum(p.numel() for p in model.parameters() if p.requires_grad))
     return model
+

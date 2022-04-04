@@ -10,13 +10,17 @@ from utils.metrics import AverageMeter, accuracy
 from figure import plot_classes_preds
 from torchsummaryX import summary
 
-from prunings.lasso import AssembleNetResNet
-from prunings.chip import calculate_ci, calculate_feature_map, prune_finetune_cifar
 from utils.utils import show_test_acc, show_profile
 from dataset import get_dataloader, get_test_dataloader
 from models.model import get_network
 
+from prunings.lasso import AssembleNetResNet
+from prunings.twinkle_lasso import TwinkleAssembleNetResNet
+from prunings.chip import calculate_ci, calculate_feature_map, prune_finetune_cifar
 from prunings.hrank import hrank_main, rank_generation
+from prunings.gal import get_gal_model, gal_main
+
+# from prunings.nuc_l2_norm import calculate_nucl2, cal_fm, nucl2_prune
 
 
 def run(cfg, writer):
@@ -29,7 +33,7 @@ def run(cfg, writer):
     Output: history of the run & classification test accuracy
     """
     dataloader, n_class = get_dataloader(cfg, get_only_targets=True)
-    test_dataloader, _ = get_test_dataloader(cfg, dataloader, get_only_targets=True)
+    get_test_dataloader(cfg, dataloader, get_only_targets=True)
     network = get_network(cfg["network"], n_class)
 
     cfg_run = cfg["run"]
@@ -57,29 +61,33 @@ def run(cfg, writer):
         network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)
         torch.save(network.state_dict(), writer.log_dir+"/best_model.pt")
 
-    show_test_acc(test(test_dataloader, network, criterion, device))   ## CIFAR
+    show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
     ################################################################
 
     summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
     show_profile(network)
 
+
+
     if cfg["network"].get("pruning", None):
         if cfg["network"]["pruning"].get("lasso", None):
             lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("chip", None):
-            network, optimizer, criterion = chip(network, cfg["network"], dataloader.train_loader, n_class, writer.log_dir)
+            network, optimizer, criterion = chip(network, cfg, dataloader, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("hrank", None):
-            network = hrank(cfg["network"], network, device, test_dataloader, criterion, n_class)
-        elif cfg["network"]["pruning"].get("var", None):
-            var()
+            network = hrank(cfg, network, device, dataloader, criterion, n_class, writer.log_dir)
+        elif cfg["network"]["pruning"].get("gal", None):
+            network = gal(dataloader, network, cfg, device, writer.log_dir, n_class)
 
-            
-        summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
+        elif cfg["network"]["pruning"].get("twinkle", None):
+            twinkle(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir)
+
+        summary(network, torch.zeros((2, 3, 32, 32)).to(torch.device("cuda")))
         show_profile(network)
-        show_test_acc(test(test_dataloader, network, criterion, device))   ## CIFAR
+        show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
 
         network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)   ## INV
-        show_test_acc(test(test_dataloader, network, criterion, device))   ## CIFAR
+        show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
     
 
 def lasso(cfg, dataloader, network, optimizer, criterion, n_class, log_dir):
@@ -92,31 +100,64 @@ def lasso(cfg, dataloader, network, optimizer, criterion, n_class, log_dir):
         agent.compress(log_dir, method=cfg["network"]["pruning"].get("method", "lasso"), k=cfg["network"]["pruning"].get("k", 0.49))
     else:
         agent.lasso_compress(cfg["network"]["pruning"]["lasso"], log_dir)
+    
+
+def twinkle(cfg, dataloader, network, optimizer, criterion, n_class, log_dir):
+    print("twinkle START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
+    agent = TwinkleAssembleNetResNet(cfg["run"], dataloader, network, optimizer, criterion, n_class)   ## INV
+    agent.init_graph(pretrained=False)
+    if cfg["network"]["pruning"]["all_classes"]:
+        all_class_dataloader, _ = get_dataloader(cfg)
+        agent.data_loader = all_class_dataloader
+        agent.compress(log_dir, t_cfg=cfg["network"]["pruning"]["twinkle"])
+    else:
+        agent.lasso_compress(log_dir, t_cfg=cfg["network"]["pruning"]["twinkle"])
 
 
-def chip(network, cfg_network, train_loader, n_class, log_dir):
+
+
+
+def chip(network, cfg, dataloader, n_class, log_dir):
+    cfg_network = cfg["network"]
     print("CHIP START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
     if cfg_network['pruning']["chip"].get("ci_path", None):
         ci_dir = cfg_network['pruning']["chip"]["ci_path"]
     else:
-        print("CAL CI START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-        calculate_feature_map(network, cfg_network["model"], train_loader, log_dir=log_dir)
-        ci_dir = calculate_ci(cfg_network["model"], log_dir)
+        if not cfg_network['pruning']["chip"].get("fm_path", None):
+            if cfg_network["pruning"]["all_classes"]:
+                dataloader, _ = get_dataloader(cfg)
+            calculate_feature_map(network, cfg_network["model"], dataloader, log_dir=log_dir)
+            fm_path = log_dir
+        else:
+            fm_path = cfg_network['pruning']["chip"]["fm_path"]
+        print("CAL CI START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")    
+        ci_dir = calculate_ci(cfg_network["model"], log_dir, fm_path=fm_path)
+    print("PRUNE START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")    
     network, optimizer, criterion = prune_finetune_cifar(cfg_network, cfg_network["load_state"], ci_dir, n_class)
     return network, optimizer, criterion
 
-def hrank(cfg_network, network, device, test_loader, criterion, n_class):
+def hrank(cfg, network, device, dataloader, criterion, n_class, log_dir):
     print("HRank START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-    rank_generation(cfg_network["model"], network, device, test_loader, criterion)
-    network = hrank_main(cfg_network, n_class)
+    cfg_network = cfg["network"]
+    if cfg_network["pruning"]["all_classes"]:
+        dataloader, _ = get_dataloader(cfg)
+    if not cfg_network["pruning"]["hrank"].get("rank_conv_path", None):
+        print("CAL RANK START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
+        rank_conv_path = rank_generation(cfg_network["model"], network, device, dataloader, criterion, log_dir)
+        cfg_network["pruning"]["hrank"].update({"rank_conv_path": rank_conv_path})
+    network = hrank_main(cfg_network, n_class, log_dir, device, dataloader)
     return network
     
 
-
-def var():
+def gal(dataloader, network, cfg, device, job_dir, n_class):
     print("GAL START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-    pass
-
+    cfg_network = cfg["network"]
+    if not cfg_network["pruning"]["gal"]["saved_path"]:
+        if cfg_network["pruning"]["all_classes"]:
+            dataloader, _ = get_dataloader(cfg)
+        gal_main(dataloader, network, cfg_network, device, job_dir, n_class)
+    network = get_gal_model(cfg_network, device, n_class)
+    return network
 
 
 def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer):
@@ -130,6 +171,9 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
     best_network = None
     TimeMeter = AverageMeter()
     start = time.time()
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=cfg_run["optimizer"].get("milestones", 10), gamma=cfg_run["optimizer"].get("gamma", 0.5))
+    
+    i = 0
     for epoch in range(cfg_run["epoch"]):
         BetchTimeMeter = AverageMeter()
         LossMeter = AverageMeter()
@@ -139,6 +183,8 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
         network.train()
 
         for inputs, labels in dataloader.train_loader:
+            # if epoch == 0 :
+            #     print(labels)
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
@@ -159,7 +205,7 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
 
             BetchTimeMeter.update(time.time() - end)
             end = time.time()
-
+        scheduler.step()
         if (epoch+1) % cfg_run["print_interval"] == 0:
             print(f'[Epoch {epoch+1}/{cfg_run["epoch"]}] [TRAIN] Loss {LossMeter.avg:.4f})\t Acc: {Top1Meter.avg:.3f})\t Time {BetchTimeMeter.avg:.3f})')
 
@@ -180,6 +226,8 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
             network.eval()
             with torch.no_grad():
                 for inputs, labels in dataloader.valid_loader:
+                    # if i == 0 :
+                    #     print(labels)
                     inputs = inputs.to(device)
                     labels = labels.to(device)
                     ## COMPUTE
@@ -196,6 +244,7 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
 
                     TimeMeter.update(time.time() - start)
                     end = time.time()
+                    i += 1
             print(f'**[Epoch {epoch+1}/{cfg_run["epoch"]}] [VAL] Loss {LossMeter.avg:.4f})\t Acc: {Top1Meter.avg:.3f})\t TotalTime: {round(TimeMeter.val/3600)}h {round(TimeMeter.val%3600/60)}min')
             print()
             ##### plot
@@ -223,8 +272,11 @@ def test(dataloader, network, criterion, device):
     running_loss = 0.0
     running_corrects = 0
 
+    i = 0
     with torch.no_grad():
         for inputs, labels in dataloader.test_loader:
+            # if i == 0 :
+            #     print(labels)
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
@@ -238,6 +290,7 @@ def test(dataloader, network, criterion, device):
             prec1 = accuracy(output.data, labels)[0]
             LossMeter.update(loss.item(), inputs.size(0))
             Top1Meter.update(prec1.item(), inputs.size(0))
+            i+=1
 
     print(f'**[TEST] Loss {LossMeter.avg:.4f})\t Acc: {Top1Meter.avg:.3f})\t')
     print()

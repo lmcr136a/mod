@@ -21,13 +21,13 @@ data:
   # target_classes: [0, 1, 2, 3, 4]
 
 network: 
-  model: resnet56
-  load_state: "experiments/pretrained/resnet34_cifar10.pt"
+  model: resnet50
+  load_state: "models/pretrained/resnet50_cifar10.pt"
 
 run:
   seed: 9099
   gpu_device: 1
-  epoch: 200
+  epoch: 100
   figure_interval: 50
   plot_interval: 10
   print_interval: 10
@@ -35,10 +35,10 @@ run:
 
   loss: crossentropy
   optimizer:
-    lr: 5.0e-5
+    lr: 5.0e-4
     name: adam
     momentum: 0.9
-    milestones: [5, 10,15]
-    gamma: 0.9
+    milestones: [15, 30, 45, 60]
+    gamma: 0.5
     weight_decay: 0.0005
     

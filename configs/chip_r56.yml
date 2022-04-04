@@ -1,0 +1,53 @@
+data:
+  for_trainNval: CIFAR10
+  for_test: CIFAR10
+
+  train:
+    augmentation: null
+    batch_size: 128
+    n_workers: 8
+    pin_memory: true
+    shuffle: true
+  val:
+    batch_size: 128
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+  test:
+    batch_size: 128
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+  target_classes: [0, 1, 2]
+
+network: 
+  model: resnet56
+  load_state: models/pretrained/resnet56_cifar10.pt
+  
+  pruning:
+    k: 0.49
+    all_classes: True  # 기본 compress: True ,  saved_index 관련 없음    
+
+    chip:
+      ci_path: #experiments/chip_r34_cifar10_not/CI_resnet34
+      fm_path: #experiments/___chip_resnet50_CIFAR10_0314_115222
+
+
+run:
+  seed: 9099
+  gpu_device: 3
+  epoch: 100
+  figure_interval: 50
+  plot_interval: 10
+  print_interval: 5
+  val_interval: 10
+
+  loss: crossentropy
+  optimizer:
+    lr: 1.0e-4
+    name: adam
+    momentum: 0.9
+    milestones: [5, 10,15]
+    gamma: 0.9
+    weight_decay: 0.0005
+    

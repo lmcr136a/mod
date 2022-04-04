@@ -12,22 +12,21 @@ import chip.utils as utils
 
 conv_index = torch.tensor(1)
 
-def calculate_feature_map(model, model_name, train_loader, log_dir, device="cuda", repeat=5):
-    log_dir = log_dir.split("/")[0]
+def calculate_feature_map(model, model_name, dataloader, log_dir, device="cuda", repeat=5):
 
     def get_feature_hook(self, input, output):
         global conv_index
 
-        if not os.path.isdir(log_dir +'/conv_feature_map/' + model_name + '_repeat%d' % (repeat)):
-            os.makedirs(log_dir +'/conv_feature_map/' + model_name + '_repeat%d' % (repeat))
-        np.save(log_dir +'/conv_feature_map/' + model_name + '_repeat%d' % (repeat) + '/conv_feature_map_'+ str(conv_index) + '.npy',
+        if not os.path.isdir(log_dir +'/conv_feature_map'):
+            os.makedirs(log_dir +'/conv_feature_map')
+        np.save(log_dir +'/conv_feature_map' + '/conv_feature_map_'+ str(conv_index) + '.npy',
                 output.cpu().numpy())
         conv_index += 1
 
     def inference():
         model.eval()
         with torch.no_grad():
-            for batch_idx, (inputs, targets) in enumerate(train_loader):
+            for batch_idx, (inputs, targets) in enumerate(dataloader.train_loader):
                 #use 5 batches to get feature maps.
                 if batch_idx >= repeat:
                     break
@@ -41,6 +40,7 @@ def calculate_feature_map(model, model_name, train_loader, log_dir, device="cuda
         # if len(gpu) > 1:
         #     relucfg = model.module.relucfg
         # else:
+        print("VGG CHIP_ CAL FM START")
         relucfg = model.relucfg
         start = time.time()
         for i, cov_id in enumerate(relucfg):
@@ -99,7 +99,7 @@ def calculate_feature_map(model, model_name, train_loader, log_dir, device="cuda
                 handler.remove()
                 cnt += 1
 
-    elif model_name=='resnet50':
+    elif model_name in ['resnet50', "resnet34"]:
         cov_layer = eval('model.maxpool')
         handler = cov_layer.register_forward_hook(get_feature_hook)
         inference()
@@ -119,20 +119,20 @@ def calculate_feature_map(model, model_name, train_loader, log_dir, device="cuda
                 inference()
                 handler.remove()
 
-                cov_layer = block[j].relu3
-                handler = cov_layer.register_forward_hook(get_feature_hook)
-                inference()
-                handler.remove()
-
-                if j==0:
+                if model_name == "resnet50":
                     cov_layer = block[j].relu3
                     handler = cov_layer.register_forward_hook(get_feature_hook)
                     inference()
                     handler.remove()
 
+                    if j==0:
+                        cov_layer = block[j].relu3
+                        handler = cov_layer.register_forward_hook(get_feature_hook)
+                        inference()
+                        handler.remove()
 
-def calculate_ci(model_name, log_dir, repeat=5):
-    log_dir = log_dir.split("/")[0]
+
+def calculate_ci(model_name, log_dir, fm_path=None, repeat=5):
     def reduced_1_row_norm(input, row_index, data_index):
         input[data_index, row_index, :] = torch.zeros(input.shape[-1])
         m = torch.norm(input[data_index, :, :], p = 'nuc').item()
@@ -163,7 +163,10 @@ def calculate_ci(model_name, log_dir, repeat=5):
             for i in range(repeat):
                 index = j * repeat + i + 1
                 # add
-                path_conv = log_dir+"/conv_feature_map/{0}_repeat5/conv_feature_map_tensor({1}).npy".format(model_name, str(index))
+                if fm_path:
+                    path_conv = fm_path+"/conv_feature_map/conv_feature_map_tensor({1}).npy".format(model_name, str(index))
+                else:
+                    path_conv = log_dir+"/conv_feature_map/conv_feature_map_tensor({1}).npy".format(model_name, str(index))
                 # path_nuc = "./feature_conv_nuc/resnet_56_repeat5/feature_conv_nuctensor({0}).npy".format(str(index))
                 # batch_ci = ci_score(path_conv, path_nuc)
                 batch_ci = ci_score(path_conv)
@@ -179,14 +182,18 @@ def calculate_ci(model_name, log_dir, repeat=5):
         num_layers = 55
     elif model_name == "resnet50":
         num_layers = 53
+    elif model_name == "resnet34":
+        num_layers = 32
+    elif model_name == "vgg_16_bn":
+        num_layers = 13
+
     save_path = log_dir + '/CI_' + model_name
 
+    print(repeat*(num_layers-1) + repeat)
     ci = mean_repeat_ci(repeat, num_layers)
 
-    if model_name == 'resnet50':
-        num_layers = 53
     for i in range(num_layers):
-        print(i)
+        print("num_layers: ", i)
         if not os.path.exists(save_path):
             os.mkdir(save_path)
         np.save(save_path + "/ci_conv{0}.npy".format(str(i + 1)), ci[i])
@@ -202,6 +209,14 @@ def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
         cnt=0
         prefix = ci_dir+'/ci_conv'
         subfix = ".npy"
+
+        for name, module in model.named_modules():
+            if isinstance(module, nn.Conv2d):
+                print(name)
+                cnt += 1
+        
+        print(cnt)
+        cnt = 0
         for name, module in model.named_modules():
             name = name.replace('module.', '')
 
@@ -246,6 +261,8 @@ def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
 
     def load_resnet_model(model, oristate_dict, layer):
         cfg = {
+            34: [3, 3, 3, 3],
+            50: [9, 9, 9],
             56: [9, 9, 9],
             110: [18, 18, 18],
         }
@@ -286,8 +303,16 @@ def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
                         if last_select_index is not None:
                             for index_i, i in enumerate(select_index):
                                 for index_j, j in enumerate(last_select_index):
-                                    state_dict[name_base+conv_weight_name][index_i][index_j] = \
-                                        oristate_dict[conv_weight_name][i][j]
+                                    try:
+                                        state_dict[name_base+conv_weight_name][index_i][index_j] = \
+                                            oristate_dict[conv_weight_name][i][j]
+                                    except:
+                                        print(name_base+conv_weight_name)
+                                        print(orifilter_num, currentfilter_num)
+                                        print(state_dict[name_base+conv_weight_name].shape, index_i, index_j)
+                                        print(oristate_dict[conv_weight_name].shape, i, j)
+                                        print(select_index, len(select_index), last_select_index, len(last_select_index))
+                                        exit()
                         else:
                             for index_i, i in enumerate(select_index):
                                 state_dict[name_base+conv_weight_name][index_i] = \
@@ -311,7 +336,7 @@ def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
 
             if isinstance(module, nn.Conv2d):
                 conv_name = name + '.weight'
-                if 'shortcut' in name:
+                if 'shortcut' in name or 'downsample' in name:
                     continue
                 if conv_name not in all_conv_weight:
                     state_dict[name_base+conv_name] = oristate_dict[conv_name]
@@ -323,7 +348,7 @@ def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
         model.load_state_dict(state_dict)
 
     import re
-    cprate_str = "[0.]+[0.4]*2+[0.5]*9+[0.6]*9+[0.7]*9"
+    cprate_str = "[0.]+[0.4]*2+[0.4]*9+[0.5]*9+[0.5]*9"
     cprate_str_list = cprate_str.split('+')
     pat_cprate = re.compile(r'\d+\.\d*')
     pat_num = re.compile(r'\*\d+')
@@ -383,10 +408,12 @@ def prune_finetune_cifar(cfg_network, pretrain_dir, ci_dir, n_class):
 
     oristate_dict = origin_model.state_dict()
 
-    if cfg_network["model"] == 'vgg16_bn':
+    if cfg_network["model"] == 'vgg_16_bn':
         load_vgg_model(model, oristate_dict)
     elif cfg_network["model"] == 'resnet56':
         load_resnet_model(model, oristate_dict, 56)
+    elif cfg_network["model"] == 'resnet34':
+        load_resnet_model(model, oristate_dict, 34)
     elif cfg_network["model"] == 'resnet110':
         load_resnet_model(model, oristate_dict, 110)
     else:

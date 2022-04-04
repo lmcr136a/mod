@@ -17,11 +17,40 @@ from utils.options import args
 import pdb
 from model import *
 
+
+
+import sys
+import datetime
+from pytz import timezone, utc
+from torchsummaryX import summary
+
+def num_(number):
+    if len(str(number)) == 1:
+        return f"0{number}"
+    else:
+        return f"{number}"
+
+
+print("\n\n\n                               START LOGGING\n\n")
+KST = timezone('Asia/Seoul')
+now = datetime.datetime.utcnow()
+t = utc.localize(now).astimezone(KST)
+args.job_dir = f'experiments/{args.title}_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
+writer_train = SummaryWriter(args.job_dir + '/run/train')
+writer_test = SummaryWriter(args.job_dir + '/run/test')
+
+f = open(args.job_dir+"/log.txt", 'w')
+sys.stdout = f
+
+
 device = torch.device(f"cuda:{args.gpus[0]}")
 ckpt = utils.checkpoint(args)
 print_logger = utils.get_logger(os.path.join(args.job_dir, "logger.log"))
 writer_train = SummaryWriter(args.job_dir + '/run/train')
 writer_test = SummaryWriter(args.job_dir + '/run/test')
+
+
+
 
 def main():
     start_epoch = 0
@@ -59,38 +88,42 @@ def main():
         elif args.arch =='googlenet':
             mask = checkpoint['mask']
             model = googlenet_sparse(has_mask = mask).to(device)
+
         model.load_state_dict(state_dict)
     else:
+        print("ELSE!!!!!!!!!!!!")
         model = import_module('utils.preprocess').__dict__[f'{args.arch}'](args, checkpoint['state_dict_s'])
+
+    summary(model, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
+    exit()
 
     print_logger.info(f"Simply test after pruning...")
     test_prec1, test_prec5 = test(args, loader.loader_test, model, criterion, writer_test)
     
-    if args.test_only:
-        return 
+    # if args.test_only:
+    #     return 
 
-    if args.keep_grad:
-        for name, weight in model.named_parameters():
-            if 'mask' in name:
-                weight.requires_grad = False
+    # if args.keep_grad:
+    #     for name, weight in model.named_parameters():
+    #         if 'mask' in name:
+    #             weight.requires_grad = False
 
     train_param = [param for name, param in model.named_parameters() if 'mask' not in name]
 
     optimizer = optim.SGD(train_param, lr=args.lr, momentum=args.momentum,weight_decay=args.weight_decay)
     scheduler = StepLR(optimizer, step_size=args.lr_decay_step, gamma=0.1)
 
-    resume = args.resume
-    if resume:
-        print('=> Loading checkpoint {}'.format(resume))
-        checkpoint = torch.load(resume, map_location=device)
-        start_epoch = checkpoint['epoch']
-        best_prec1 = checkpoint['best_prec1']
-        model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        scheduler.load_state_dict(checkpoint['scheduler'])
-        print('=> Continue from epoch {}...'.format(start_epoch))
-
-
+    # resume = args.resume
+    # if resume:
+    #     print('=> Loading checkpoint {}'.format(resume))
+    #     checkpoint = torch.load(resume, map_location=device)
+    #     start_epoch = checkpoint['epoch']
+    #     best_prec1 = checkpoint['best_prec1']
+    #     model.load_state_dict(checkpoint['state_dict'])
+    #     optimizer.load_state_dict(checkpoint['optimizer'])
+    #     scheduler.load_state_dict(checkpoint['scheduler'])
+    #     print('=> Continue from epoch {}...'.format(start_epoch))
+    
     for epoch in range(start_epoch, args.num_epochs):
         scheduler.step(epoch)
 

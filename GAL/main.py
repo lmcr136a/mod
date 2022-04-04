@@ -17,11 +17,36 @@ from model import Discriminator
 from data import cifar10
 import pdb 
 
+
+
+import sys
+import datetime
+from pytz import timezone, utc
+
+def num_(number):
+    if len(str(number)) == 1:
+        return f"0{number}"
+    else:
+        return f"{number}"
+
+
+print("\n\n\n                               START LOGGING\n\n")
+KST = timezone('Asia/Seoul')
+now = datetime.datetime.utcnow()
+t = utc.localize(now).astimezone(KST)
+args.job_dir = f'experiments/{args.title}_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
+writer_train = SummaryWriter(args.job_dir + '/run/train')
+writer_test = SummaryWriter(args.job_dir + '/run/test')
+
+f = open(args.job_dir+"/log.txt", 'w')
+sys.stdout = f
+
+
+
 device = torch.device(f"cuda:{args.gpus[0]}")
 checkpoint = utils.checkpoint(args)
 print_logger = utils.get_logger(os.path.join(args.job_dir, "logger.log"))
-writer_train = SummaryWriter(args.job_dir + '/run/train')
-writer_test = SummaryWriter(args.job_dir + '/run/test')
+
 
 def main():
 
@@ -35,7 +60,7 @@ def main():
 
     # Create model
     print('=> Building model...')
-    model_t = import_module(f'model.{args.arch}').__dict__[args.teacher_model]().to(device)
+    model_t = import_module(f'model.imagenet.{args.arch}').__dict__[args.teacher_model]().to(device)
 
     # Load teacher model
     ckpt_t = torch.load(args.teacher_dir, map_location=device)
@@ -51,7 +76,7 @@ def main():
                 new_key = 'fc.bias'
             state_dict_t[new_key] = v
     else:
-        state_dict_t = ckpt_t['state_dict']
+        state_dict_t = ckpt_t
 
 
     model_t.load_state_dict(state_dict_t)
@@ -60,7 +85,7 @@ def main():
     for para in list(model_t.parameters())[:-2]:
         para.requires_grad = False
 
-    model_s = import_module(f'model.{args.arch}').__dict__[args.student_model]().to(device)
+    model_s = import_module(f'model.imagenet.{args.arch}').__dict__[args.student_model]().to(device)
 
     model_dict_s = model_s.state_dict()
     model_dict_s.update(state_dict_t)

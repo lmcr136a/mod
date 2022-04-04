@@ -285,7 +285,7 @@ class Downsample(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=1000, has_mask=None, indexes=None, cfg=None):
+    def __init__(self, block, layers, num_classes=10, has_mask=None, indexes=None, cfg=None):
         self.inplanes = 64
         super(ResNet, self).__init__()
 
@@ -304,7 +304,7 @@ class ResNet(nn.Module):
         start = 0
         cfg_start = 0
         cfg_end = 3*layers[0]
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
