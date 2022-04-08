@@ -1,4 +1,5 @@
 import math
+import time
 import torch
 import numpy as np
 from sklearn.linear_model import Lasso
@@ -105,7 +106,10 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
         # 원하는 수의 채널이 삭제될 때까지 alpha 값을 조금씩 늘려나감
         alpha_l, alpha_r = 0, alpha
         num_pruned_try = 0
+        c = -1
+        start = time.time()
         while num_pruned_try < num_pruned:
+            c += 1
             alpha_r *= 2
             solver.alpha = alpha_r
             # solver.fit(selected_y_channel_spread, new_output)
@@ -114,7 +118,12 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
 
         # 충분하게 pruning 되는 alpha 를 찾으면, 이후 alpha 값의 좌우를 좁혀 나가면서 좀 더 정확한 alpha 값을 찾음
         num_pruned_max = int(num_pruned)
+        print(solver.alpha, num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min, start finding coef")
+
+        c = -1
+        start = time.time()
         while True:
+            c+=1
             alpha = (alpha_l + alpha_r) / 2
             solver.alpha = alpha
             # solver.fit(selected_y_channel_spread, new_output)
@@ -127,6 +136,7 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
                 alpha_l = alpha
             else:
                 break
+        print(solver.alpha, num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min =========")
 
         # 마지막으로, lasso coeff를 index로 변환
         indices_stayed = np.where(solver.coef_ != 0)[0].tolist()

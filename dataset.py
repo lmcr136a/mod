@@ -22,15 +22,17 @@ def get_dataloader(cfg, for_test=False, get_only_targets=False):
     else:
         flag="for_trainNval"
 
+    target_classes=cfg_data.get("target_classes", None)
+
     print(flag, ":    ", cfg_data[flag])
     if cfg_data[flag] == "CIFAR10":
-        return CifarDataLoader(cfg, 10, get_only_targets=get_only_targets, target_classes=cfg_data.get("target_classes", None)), 10
+        return CifarDataLoader(cfg, 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
     elif cfg_data[flag] == "CIFAR100":
-        return CifarDataLoader(cfg, 100, get_only_targets=get_only_targets, target_classes=cfg_data.get("target_classes", None)), 100
+        return CifarDataLoader(cfg, 100, get_only_targets=get_only_targets, target_classes=target_classes), max(100, len(target_classes))
     elif cfg_data[flag] == "INV10":
-        return InversionDataLoader(cfg, 10, get_only_targets=get_only_targets, target_classes=cfg_data.get("target_classes", None)), 10
+        return InversionDataLoader(cfg, 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
     elif cfg_data[flag] == "INV100":
-        return InversionDataLoader(cfg, 100, get_only_targets=get_only_targets, target_classes=cfg_data.get("target_classes", None)), 100
+        return InversionDataLoader(cfg, 100, get_only_targets=get_only_targets, target_classes=target_classes), max(100, len(target_classes))
 
 
 def get_test_dataloader(cfg, dataloader, get_only_targets=False):

@@ -25,6 +25,7 @@ cudnn.benchmark = True
 import logging
 
 
+
 class BaseAgent:
     """
     This base class will contain the base functions to be overloaded by any agent you will implement.
@@ -281,7 +282,9 @@ class TwinkleAssembleNetResNet(BaseAgent):
         
         k = t_cfg.get("k", 0.49)
         tw_d = t_cfg["tw_d"]
-        print("DIM :", tw_d)
+        minous = t_cfg["minous"]
+        minous_tw = t_cfg["minous_tw"]
+        print("DIM :", tw_d, "  SECOND_PENALTY: ", minous, "  SECOND_PENALTY_DIM: ", minous_tw)
         print("DATALOADER LABELS: ", self.data_loader.train_loader.dataset.targets[:30])
         
         inputs, _ = next(iter(self.data_loader.train_loader))
@@ -302,7 +305,7 @@ class TwinkleAssembleNetResNet(BaseAgent):
                 conv2 = self.named_modules_list[str(i)].conv2
                 input_feature = torch.relu(bn1(conv1(x)))
                 
-                indices_stayed, indices_pruned = channel_selection(input_feature, conv2, tw_d=tw_d, sparsity=(1.-k))
+                indices_stayed, indices_pruned = channel_selection(input_feature, conv2, tw_d=tw_d, minous=minous, minous_tw=minous_tw, sparsity=(1.-k))
                 total_indices_stayed[i].append(indices_stayed)
                 
                 module_surgery(conv1, bn1, conv2, indices_stayed)
@@ -318,12 +321,15 @@ class TwinkleAssembleNetResNet(BaseAgent):
 
 
     def lasso_compress(self, log_dir, t_cfg):
-        k = t_cfg.get("k", 0.49)
-        tw_d = t_cfg["tw_d"]
+        
+        self.k = t_cfg.get("k", 0.49)
+        self.tw_d = t_cfg["tw_d"]
+        self.minous = t_cfg["minous"]
+        self.minous_tw = t_cfg["minous_tw"]
+        print("DIM :", self.tw_d, "  SECOND_PENALTY: ", self.minous, "  SECOND_PENALTY_DIM: ", self.minous_tw)
         saved_index = t_cfg.get("saved_index", None)
         batch = t_cfg.get("batch", None)
 
-        print("DIM :", tw_d)
         print('THIS IS TWINKLE COMPRESS!!!!!!!!!!!!!!!!\n\n')
 
         if batch:
@@ -337,27 +343,36 @@ class TwinkleAssembleNetResNet(BaseAgent):
             loader = zip(concated_input, [0]*len(concated_input))
         else:        
             loader = self.data_loader.train_loader
-        
 
         if not saved_index:
             total_indices_stayed = [[] for i in range(len(self.all_list))]
+            p = torch.multiprocessing.Pool(3)
+            
+
             for inputs, label in loader:
                 if self.cuda:
                     inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
                 x = inputs
-                print("nnnnnnmnmnmnmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmnmnmnmnnnnnn")
+
+                map_list = []
                 for i, m in enumerate(self.all_list):
                     if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
-                        conv1 = self.named_modules_list[str(i)].conv1
-                        bn1 = self.named_modules_list[str(i)].bn1
-                        conv2 = self.named_modules_list[str(i)].conv2
-                        input_feature = torch.relu(bn1(conv1(x)))
-                        
-                        indices_stayed, indices_pruned = channel_selection(input_feature, conv2, tw_d=tw_d, sparsity=(1.-k))
-                        total_indices_stayed[i].append(indices_stayed)
+                        map_list.append([i, m, x.detach()])
                     elif isinstance(m, torch.nn.Linear):
                         break
                     x = m(x)
+
+                indices = p.map(self.merge_pool, map_list)
+                c=0
+                for i, m in indices:
+                    total_indices_stayed[i].append(indices[c])
+                    c+=1
+
+                if c != len(indices):
+                    print("뭔가 잘못되었다")
+                else:
+                    print("잘 되었다")
+
                 break  ##########################
             torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
 
@@ -391,7 +406,19 @@ class TwinkleAssembleNetResNet(BaseAgent):
                 break
             x = m(x)
         self.original_conv_output = dict()  # clear original output to save cuda memory
-    
+        
+    def get_indices(self, i, m, x):
+        conv1 = self.named_modules_list[str(i)].conv1
+        bn1 = self.named_modules_list[str(i)].bn1
+        conv2 = self.named_modules_list[str(i)].conv2
+        input_feature = torch.relu(bn1(conv1(x)))
+        
+        indices_stayed, indices_pruned = channel_selection(input_feature, conv2, tw_d=self.tw_d, minous=self.minous, minous_tw=self.minous_tw, sparsity=(1.-self.k))
+        return indices_stayed
+
+    def merge_pool(self, args):
+        i, m, x = args[0], args[1], args[2]
+        return self.get_indices(i, m, x)
 
 
     def get_total_top_indices(self, total_indices_stayed, k=None):
