@@ -14,7 +14,7 @@ import models
 
 from models.resnet_cifar import *
 from models.resnet_imagenet import *
-from prunings.twinkle import *
+from prunings.lasso_channel import *
 from dataset import *
 from utils.metrics import AverageMeter, accuracy
 from utils.misc import timeit, print_cuda_statistics
@@ -23,7 +23,6 @@ from math import cos, pi
 
 cudnn.benchmark = True
 import logging
-
 
 
 class BaseAgent:
@@ -37,7 +36,7 @@ class BaseAgent:
 
 
 class TwinkleAssembleNetResNet(BaseAgent):
-    def __init__(self, config, dataloader, best_network, optimizer, criterion, n_class):
+    def __init__(self, config, dataloader, best_network, optimizer, criterion, n_class, device):
         super().__init__(config)
 
         # set device
@@ -45,9 +44,7 @@ class TwinkleAssembleNetResNet(BaseAgent):
         self.cuda = self.is_cuda
         self.manual_seed = self.config.get("seed", 9099)
         if self.cuda:
-            self.device = torch.device("cuda")
-
-            self.logger.info("Program will run on *****GPU-CUDA*****\n")
+            self.device = device
         else:
             self.device = torch.device("cpu")
             torch.manual_seed(self.manual_seed)
@@ -278,13 +275,18 @@ class TwinkleAssembleNetResNet(BaseAgent):
         pass
 
     @timeit
-    def compress(self, log_dir, t_cfg):
-        
-        k = t_cfg.get("k", 0.49)
-        tw_d = t_cfg["tw_d"]
-        minous = t_cfg["minous"]
-        minous_tw = t_cfg["minous_tw"]
-        print("DIM :", tw_d, "  SECOND_PENALTY: ", minous, "  SECOND_PENALTY_DIM: ", minous_tw)
+    def compress(self, log_dir, method='gradient', k=0.5):
+        if method == "first_k":
+            for i, m in enumerate(self.all_list):
+                if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+                    conv1 = self.named_modules_list[str(i) + '.conv1']
+                    bn1 = self.named_modules_list[str(i) + '.bn1']
+                    conv2 = self.named_modules_list[str(i) + '.conv2']
+                    bn2 = self.named_modules_list[str(i) + '.bn2']
+                    indices_stayed = [i for i in range(int(conv1.out_channels * k))]
+                    module_surgery(conv1, bn1, conv2, indices_stayed)
+            return
+
         print("DATALOADER LABELS: ", self.data_loader.train_loader.dataset.targets[:30])
         
         inputs, _ = next(iter(self.data_loader.train_loader))
@@ -295,85 +297,129 @@ class TwinkleAssembleNetResNet(BaseAgent):
         start = time.time()
         
         total_indices_stayed = [[] for i in range(len(self.all_list))]
+        print(f"mmmmmmmmmmmmmmmmmmmmmmmmmm {method} mmmmmmmmmmmmmmmmmmmmmmmmmm")
+        if method == 'max_output':    # 채널의 가장 큰 아웃풋을 활용한 중요도로 프루닝
+            x = inputs
+            for i, m in enumerate(self.all_list):
+                if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+                    conv1 = self.named_modules_list[str(i)].conv1
+                    bn1 = self.named_modules_list[str(i)].bn1
+                    conv2 = self.named_modules_list[str(i)].conv2
+                    num_channel = int(k * conv1.out_channels)
+                    channel_norm = conv1(x).norm(dim=(2, 3)).mean(dim=0)
+                    indices_stayed = torch.argsort(channel_norm, descending=True)[:num_channel]  # 가장 큰 채널들의 index를 리턴
+                    total_indices_stayed[i].append(indices_stayed)
 
-        x = inputs
-        for i, m in enumerate(self.all_list):
-            print(m)
-            if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
-                conv1 = self.named_modules_list[str(i)].conv1
-                bn1 = self.named_modules_list[str(i)].bn1
-                conv2 = self.named_modules_list[str(i)].conv2
-                input_feature = torch.relu(bn1(conv1(x)))
-                
-                indices_stayed, indices_pruned = channel_selection(input_feature, conv2, tw_d=tw_d, minous=minous, minous_tw=minous_tw, sparsity=(1.-k))
-                total_indices_stayed[i].append(indices_stayed)
-                
-                module_surgery(conv1, bn1, conv2, indices_stayed)
-                pruned_input_feature = torch.relu(bn1(conv1(x)))
-                output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
-                weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
-            elif isinstance(m, torch.nn.Linear):
-                break
-            x = m(x)
+                    module_surgery(conv1, bn1, conv2, indices_stayed)
+                    pruned_input_feature = torch.relu(bn1(conv1(x)))
+                    output_feature = self.original_conv_output[str(i) + '.conv2']
+                    weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
+                elif isinstance(m, torch.nn.Linear):
+                    break
+                x = m(x)
+        elif method == 'greedy':
+            x = inputs
+            for i, m in enumerate(self.all_list):
+                if isinstance(m, models.resnet_imagenet.Bottleneck):
+                    conv1 = self.named_modules_list[str(i)].conv1
+                    bn1 = self.named_modules_list[str(i)].bn1
+                    conv2 = self.named_modules_list[str(i)].conv2
+                    bn2 = self.named_modules_list[str(i)].bn2
+                    conv3 = self.named_modules_list[str(i)].conv3
+
+
+                    f_input_feature = torch.relu(bn1(conv1(x)))
+                    f_indices_stayed, f_indices_pruned = channel_selection(f_input_feature, conv2, sparsity=(1.-k), method='greedy')
+                    total_indices_stayed[i].append(f_indices_stayed)
+                    module_surgery(conv1, bn1, conv2, f_indices_stayed)
+                    f_pruned_input_feature = torch.relu(bn1(conv1(x)))
+                    f_output_feature = self.original_conv_output[str(i) + '.conv2']
+                    weight_reconstruction(conv2, f_pruned_input_feature, f_output_feature, use_gpu=self.cuda)
+
+
+                    s_input_feature = torch.relu(bn2(conv2(f_pruned_input_feature)))
+                    s_indices_stayed, s_indices_pruned = channel_selection(s_input_feature, conv3, sparsity=(1.-k), method='greedy')
+                    module_surgery(conv2, bn2, conv3, s_indices_stayed)
+                    s_pruned_input_feature = torch.relu(bn2(conv2(f_pruned_input_feature)))
+                    s_output_feature = self.original_conv_output[str(i) + '.conv3']
+                    weight_reconstruction(conv3, s_pruned_input_feature, s_output_feature, use_gpu=self.cuda)
+
+
+                elif isinstance(m, torch.nn.Linear):
+                    break
+                x = m(x)
+
+        elif method == 'lasso': ###################################################################
+            x = inputs
+            for i, m in enumerate(self.all_list):
+                print(m)
+                if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+                    conv1 = self.named_modules_list[str(i)].conv1
+                    bn1 = self.named_modules_list[str(i)].bn1
+                    conv2 = self.named_modules_list[str(i)].conv2
+                    input_feature = torch.relu(bn1(conv1(x)))
+                    
+                    indices_stayed, indices_pruned = channel_selection(input_feature, conv2, sparsity=(1.-k), method='lasso')
+                    total_indices_stayed[i].append(indices_stayed)
+                    
+                    module_surgery(conv1, bn1, conv2, indices_stayed)
+                    pruned_input_feature = torch.relu(bn1(conv1(x)))
+                    output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
+                    weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
+                elif isinstance(m, torch.nn.Linear):
+                    break
+                x = m(x)
         torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
         print(total_indices_stayed)
         self.original_conv_output = dict()  # clear original output to save cuda memory
-
 
     def lasso_compress(self, log_dir, t_cfg):
         
         self.k = t_cfg.get("k", 0.49)
         self.tw_d = t_cfg["tw_d"]
-        self.minous = t_cfg["minous"]
-        self.minous_tw = t_cfg["minous_tw"]
+        self.minous = 1
+        self.minous_tw = 1
         print("DIM :", self.tw_d, "  SECOND_PENALTY: ", self.minous, "  SECOND_PENALTY_DIM: ", self.minous_tw)
         saved_index = t_cfg.get("saved_index", None)
         batch = t_cfg.get("batch", None)
 
         print('THIS IS TWINKLE COMPRESS!!!!!!!!!!!!!!!!\n\n')
 
-        if batch:
-            concated_input = torch.Tensor([])
-            for inputs, label in (self.data_loader.train_loader):
-                concated_input = torch.cat((concated_input, inputs), 0)
-            if self.cuda:
-                concated_input = concated_input.cuda(non_blocking=self.config.get("async_loading", True))
-            concated_input = torch.split(concated_input, batch, dim=0)
-            print(len(concated_input))
-            loader = zip(concated_input, [0]*len(concated_input))
-        else:        
-            loader = self.data_loader.train_loader
+        # if batch:
+        #     concated_input = torch.Tensor([])
+        #     for inputs, label in (self.data_loader.train_loader):
+        #         concated_input = torch.cat((concated_input, inputs), 0)
+        #     if self.cuda:
+        #         concated_input = concated_input.cuda(non_blocking=self.config.get("async_loading", True))
+        #     concated_input = torch.split(concated_input, batch, dim=0)
+        #     print(len(concated_input))
+        #     loader = zip(concated_input, [0]*len(concated_input))
+        # else:        
+        loader = self.data_loader.train_loader
 
         if not saved_index:
             total_indices_stayed = [[] for i in range(len(self.all_list))]
-            p = torch.multiprocessing.Pool(3)
-            
+            p = torch.multiprocessing.Pool(6)
+            inputs, _ = next(iter(self.data_loader.train_loader))
+            if self.cuda:
+                inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
+            x = inputs
 
-            for inputs, label in loader:
-                if self.cuda:
-                    inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
-                x = inputs
+            map_list = []
+            for i, m in enumerate(self.all_list):
+                if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+                    map_list.append([i, m, x.detach()])
+                elif isinstance(m, torch.nn.Linear):
+                    break
+                x = m(x)
 
-                map_list = []
-                for i, m in enumerate(self.all_list):
-                    if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
-                        map_list.append([i, m, x.detach()])
-                    elif isinstance(m, torch.nn.Linear):
-                        break
-                    x = m(x)
-
-                indices = p.map(self.merge_pool, map_list)
-                c=0
-                for i, m in indices:
-                    total_indices_stayed[i].append(indices[c])
-                    c+=1
-
-                if c != len(indices):
-                    print("뭔가 잘못되었다")
-                else:
-                    print("잘 되었다")
-
-                break  ##########################
+            indices = p.map(self.merge_pool, map_list)
+            print(indices)
+            c=0
+            for i, m in indices:
+                print(i, m)
+                total_indices_stayed[i].append(m)
+                c+=1
             torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
 
         else:
@@ -413,12 +459,12 @@ class TwinkleAssembleNetResNet(BaseAgent):
         conv2 = self.named_modules_list[str(i)].conv2
         input_feature = torch.relu(bn1(conv1(x)))
         
-        indices_stayed, indices_pruned = channel_selection(input_feature, conv2, tw_d=self.tw_d, minous=self.minous, minous_tw=self.minous_tw, sparsity=(1.-self.k))
+        indices_stayed, indices_pruned = channel_selection(input_feature, conv2, sparsity=(1.-self.k), method='lasso')
         return indices_stayed
 
     def merge_pool(self, args):
         i, m, x = args[0], args[1], args[2]
-        return self.get_indices(i, m, x)
+        return i, self.get_indices(i, m, x)
 
 
     def get_total_top_indices(self, total_indices_stayed, k=None):
@@ -427,7 +473,12 @@ class TwinkleAssembleNetResNet(BaseAgent):
             if len(a_layer_indices)==0:
                 output.append([])
             else:
-                output.append(self.get_top_indices(torch.Tensor(a_layer_indices)).tolist())
+                if type(a_layer_indices[0]) == tuple:
+                    output.append(a_layer_indices[0][1])
+                else:
+                    ten = torch.Tensor(np.array(a_layer_indices))
+                    top = self.get_top_indices(ten)
+                    output.append(top.tolist())
         return output
 
 

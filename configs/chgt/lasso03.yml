@@ -25,17 +25,15 @@ network:
   load_state: models/pretrained/resnet34_cifar100.pt
   
   pruning:
+    k: 0.3
     all_classes: False  # 기본 compress: True ,  saved_index 관련 없음             
-    twinkle:
-      k: 0.49
-      tw_d: 1.0
-      minous: 1
-      minous_tw: 0.9
-      saved_index:
+    lasso:
+      saved_index: #experiments/lasso_012_r56_inv10/total_indices_stayed.pt
+      # batch: 512
 
 run:
   seed: 9099
-  gpu_device: 2
+  gpu_device: 1
   epoch: 30
   figure_interval: 50
   plot_interval: 10
@@ -50,4 +48,3 @@ run:
     milestones: [5, 10,15]
     gamma: 0.9
     weight_decay: 0.0005
-    

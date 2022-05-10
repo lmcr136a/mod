@@ -29,10 +29,14 @@ def get_dataloader(cfg, for_test=False, get_only_targets=False):
         return CifarDataLoader(cfg, 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
     elif cfg_data[flag] == "CIFAR100":
         return CifarDataLoader(cfg, 100, get_only_targets=get_only_targets, target_classes=target_classes), max(100, len(target_classes))
-    elif cfg_data[flag] == "INV10":
-        return InversionDataLoader(cfg, 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
-    elif cfg_data[flag] == "INV100":
-        return InversionDataLoader(cfg, 100, get_only_targets=get_only_targets, target_classes=target_classes), max(100, len(target_classes))
+    elif cfg_data[flag] == "NINV10":
+        return InversionDataLoader(cfg, 'ninv', 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
+    elif cfg_data[flag] == "NINV100":
+        return InversionDataLoader(cfg, 'ninv', 100, get_only_targets=get_only_targets, target_classes=target_classes), max(100, len(target_classes))
+    elif cfg_data[flag] == "DINV10":
+        return InversionDataLoader(cfg, 'dinv', 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
+    elif cfg_data[flag] == "DINV1000":
+        return InversionDataLoader(cfg, 'dinv', 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
 
 
 def get_test_dataloader(cfg, dataloader, get_only_targets=False):
@@ -118,7 +122,7 @@ class CifarDataLoader:
 
 
 class InversionDataLoader:
-    def __init__(self, config, class_num, get_only_targets, target_classes):
+    def __init__(self, config, dirname, class_num, get_only_targets, target_classes):
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
         torch.manual_seed(config["run"].get("seed", 9099))
@@ -126,10 +130,10 @@ class InversionDataLoader:
         random.seed(config["run"].get("seed", 9099))
         np.random.seed(config["run"].get("seed", 9099))
         self.config = config["run"]
-        self.logger = logging.getLogger(f"Inversion Cifar{class_num}DataLoader")
+        self.logger = logging.getLogger(f"{dirname} cifar{class_num} dataloader")
 
         if "resnet" in config["network"]["model"]:
-            data_path = f'./data/inversion/{config["data"]["for_test"].lower()}_r{config["network"]["model"][-2:]}_196/'
+            data_path = f'./data/{dirname}/{config["data"]["for_test"].lower()}_r{config["network"]["model"][-2:]}/'
         else:
             pass
         

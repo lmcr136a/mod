@@ -2,6 +2,7 @@ import numpy as np
 import math
 import time
 import torch
+import cv2
 from sklearn.preprocessing import StandardScaler
 from scipy.optimize import minimize
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
@@ -9,7 +10,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 num_pruned_tolerate_coeff = 1.1
 
 from sklearn.linear_model import Lasso
-
+from relaxed_lasso import RelaxedLasso, RelaxedLassoCV
 
 
 
@@ -30,14 +31,14 @@ def channel_selection(inputs, module, tw_d, minous, minous_tw, sparsity=0.5):
         bias = 0.
     y = y.view(-1).data.cpu().numpy()  # flatten all of outputs
     y_channel_spread = []
+    
     for i in range(num_channel):
-        x_channel_i = torch.zeros_like(inputs)
-        x_channel_i[:, i, ...] = inputs[:, i, ...]
-        y_channel_i = module(x_channel_i) - bias
+        x_channel_i = torch.zeros_like(inputs)  # b * c * h * w
+        x_channel_i[:, i, ...] = inputs[:, i, ...]  # 해당 채널만 값 복사
+        y_channel_i = module(x_channel_i) - bias   # 해당 채널에 대한 아웃풋
+
         y_channel_spread.append(y_channel_i.data.view(-1, 1))
     y_channel_spread = torch.cat(y_channel_spread, dim=1).cpu()
-
-
     if num_pruned <= 33:
         alpha = 1e-5
     elif num_pruned <= 66:
@@ -48,7 +49,11 @@ def channel_selection(inputs, module, tw_d, minous, minous_tw, sparsity=0.5):
         alpha = 1e-8
 
 
-    solver = Lasso(twinkle=True, tw=tw_d, alpha=alpha, random_state=0, minous=minous, minous_tw=minous_tw)
+    # solver = Lasso(twinkle=False, tw=tw_d, alpha=alpha, random_state=0, minous=minous, minous_tw=minous_tw)
+    solver = RelaxedLasso()
+    print("Relaxed Lasso", num_pruned)
+
+
     # 원하는 수의 채널이 삭제될 때까지 alpha 값을 조금씩 늘려나감
     alpha_l, alpha_r = 0, alpha
     num_pruned_try = 0
@@ -61,7 +66,7 @@ def channel_selection(inputs, module, tw_d, minous, minous_tw, sparsity=0.5):
         solver.fit(y_channel_spread,y)
         num_pruned_try = sum(solver.coef_ == 0)
         c += 1
-    print(solver.alpha, num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min, start finding coef")
+    print(num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min, start finding coef")
 
     # 충분하게 pruning 되는 alpha 를 찾으면, 이후 alpha 값의 좌우를 좁혀 나가면서 좀 더 정확한 alpha 값을 찾음
     num_pruned_max = int(num_pruned)
@@ -82,7 +87,7 @@ def channel_selection(inputs, module, tw_d, minous, minous_tw, sparsity=0.5):
         else:
             break
     
-    print(solver.alpha, num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min =========")
+    print(round(solver.alpha,4), num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min =========")
 
     
     # 마지막으로, lasso coeff를 index로 변환

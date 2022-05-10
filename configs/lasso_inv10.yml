@@ -1,5 +1,5 @@
 data:
-  for_trainNval: INV10
+  for_trainNval: DINV10
   for_test: CIFAR10
 
   train:
@@ -26,7 +26,7 @@ network:
   
   pruning:
     k: 0.49
-    all_classes: True  # 기본 compress: True ,  saved_index 관련 없음             
+    all_classes: False  # 기본 compress: True ,  saved_index 관련 없음             
     lasso:
       saved_index: #experiments/lasso_r34_inv100_09/total_indices_stayed.pt
       # batch: 512

@@ -11,14 +11,11 @@ import datetime
 from pytz import timezone, utc
 
 
-
 def num_(number):
     if len(str(number)) == 1:
         return f"0{number}"
     else:
         return f"{number}"
-
-
 
 
 def configuration(config, force_gpu):
@@ -30,8 +27,9 @@ def configuration(config, force_gpu):
     with open("configs/"+config, encoding="utf-8") as fp:
         cfg = yaml.load(fp, Loader=yaml.FullLoader)        
 
-    if force_gpu:
-        cfg['run']['gpu_device']=force_gpu
+    if force_gpu is not None:
+        cfg['run']['gpu_device']=force_gpu # 하지만 안쓰임
+        os.environ["CUDA_VISIBLE_DEVICES"]= str(force_gpu)
     print(f"\n{'*'*10}START LOGGING, GPU: {cfg['run']['gpu_device']} {'*'*10}\n")
     KST = timezone('Asia/Seoul')
     now = datetime.datetime.utcnow()

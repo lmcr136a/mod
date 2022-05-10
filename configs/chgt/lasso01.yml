@@ -1,11 +1,11 @@
 data:
-  for_trainNval: CIFAR10
-  for_test: CIFAR10
+  for_trainNval: CIFAR100
+  for_test: CIFAR100
 
   train:
     augmentation: null
     batch_size: 128
-    n_workers: 4
+    n_workers: 8
     pin_memory: true
     shuffle: true
   val:
@@ -18,20 +18,18 @@ data:
     n_workers: 4
     pin_memory: true
     shuffle: false
-  target_classes: [0, 1, 2]
+  target_classes: [0, 1, 2, 3, 4]
 
 network: 
   model: resnet34
-  load_state: models/pretrained/resnet34_cifar10.pt
+  load_state: models/pretrained/resnet34_cifar100.pt
   
   pruning:
     all_classes: False  # 기본 compress: True ,  saved_index 관련 없음             
-    twinkle:
-      k: 0.49
-      tw_d: 0.99
-      minous: 0
-      minous_tw: 1
-      saved_index:
+    lasso:
+      saved_index: #experiments/lasso_012_r56_inv10/total_indices_stayed.pt
+      k: 0.1
+      # batch: 512
 
 run:
   seed: 9099
@@ -50,4 +48,3 @@ run:
     milestones: [5, 10,15]
     gamma: 0.9
     weight_decay: 0.0005
-    

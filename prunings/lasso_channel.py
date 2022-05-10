@@ -1,6 +1,7 @@
 import math
 import time
 import torch
+import cv2
 import numpy as np
 from sklearn.linear_model import Lasso
 from scipy.spatial import distance
@@ -24,58 +25,58 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
     num_stayed = num_channel - num_pruned
 
     print('num_pruned', num_pruned)
-    if method == 'greedy':
-        indices_pruned = []
-        while len(indices_pruned) < num_pruned:
-            min_diff = 1e10
-            min_idx = 0
-            for idx in range(num_channel):
-                if idx in indices_pruned:
-                    continue
-                indices_try = indices_pruned + [idx]
-                inputs_try = torch.zeros_like(inputs)
-                inputs_try[:, indices_try, ...] = inputs[:, indices_try, ...]
-                output_try = module(inputs_try)
-                output_try_norm = output_try.norm(2)
-                if output_try_norm < min_diff:
-                    min_diff = output_try_norm
-                    min_idx = idx
-            indices_pruned.append(min_idx)
+    # if method == 'greedy':
+    #     indices_pruned = []
+    #     while len(indices_pruned) < num_pruned:
+    #         min_diff = 1e10
+    #         min_idx = 0
+    #         for idx in range(num_channel):
+    #             if idx in indices_pruned:
+    #                 continue
+    #             indices_try = indices_pruned + [idx]
+    #             inputs_try = torch.zeros_like(inputs)
+    #             inputs_try[:, indices_try, ...] = inputs[:, indices_try, ...]
+    #             output_try = module(inputs_try)
+    #             output_try_norm = output_try.norm(2)
+    #             if output_try_norm < min_diff:
+    #                 min_diff = output_try_norm
+    #                 min_idx = idx
+    #         indices_pruned.append(min_idx)
 
-        print('indices_pruned !!! ', indices_pruned)
+    #     print('indices_pruned !!! ', indices_pruned)
 
-        indices_stayed = list(set([i for i in range(num_channel)]) - set(indices_pruned))
+    #     indices_stayed = list(set([i for i in range(num_channel)]) - set(indices_pruned))
 
-    elif method == 'greedy_GM':
-        indices_stayed = []
-        while len(indices_stayed) < num_stayed:
-            max_farthest_channel_norm = 1e-10
-            farthest_channel_idx = 0
+    # elif method == 'greedy_GM':
+    #     indices_stayed = []
+    #     while len(indices_stayed) < num_stayed:
+    #         max_farthest_channel_norm = 1e-10
+    #         farthest_channel_idx = 0
 
-            for idx in range(num_channel):
-                if idx in indices_stayed:
-                    continue
-                indices_try = indices_stayed + [idx]
-                inputs_try = torch.zeros_like(inputs)
-                inputs_try[:, indices_try, ...] = inputs[:, indices_try, ...]
-                output_try = module(inputs_try).view(num_channel,-1).cpu().detach().numpy()
-                similar_matrix = distance.cdist(output_try, output_try,'euclidean')
-                similar_sum = np.sum(np.abs(similar_matrix), axis=0)
-                similar_large_index = similar_sum.argsort()[-1]
-                farthest_channel_norm= np.linalg.norm(similar_sum[similar_large_index])
+    #         for idx in range(num_channel):
+    #             if idx in indices_stayed:
+    #                 continue
+    #             indices_try = indices_stayed + [idx]
+    #             inputs_try = torch.zeros_like(inputs)
+    #             inputs_try[:, indices_try, ...] = inputs[:, indices_try, ...]
+    #             output_try = module(inputs_try).view(num_channel,-1).cpu().detach().numpy()
+    #             similar_matrix = distance.cdist(output_try, output_try,'euclidean')
+    #             similar_sum = np.sum(np.abs(similar_matrix), axis=0)
+    #             similar_large_index = similar_sum.argsort()[-1]
+    #             farthest_channel_norm= np.linalg.norm(similar_sum[similar_large_index])
 
-                if max_farthest_channel_norm < farthest_channel_norm :
-                    max_farthest_channel_norm = farthest_channel_norm
-                    farthest_channel_idx = idx
+    #             if max_farthest_channel_norm < farthest_channel_norm :
+    #                 max_farthest_channel_norm = farthest_channel_norm
+    #                 farthest_channel_idx = idx
 
-            print(farthest_channel_idx)
-            indices_stayed.append(farthest_channel_idx)
+    #         print(farthest_channel_idx)
+    #         indices_stayed.append(farthest_channel_idx)
 
-        print('indices_stayed !!! ', indices_stayed)
+    #     print('indices_stayed !!! ', indices_stayed)
 
-        indices_pruned = list(set([i for i in range(num_channel)]) - set(indices_stayed))
+    #     indices_pruned = list(set([i for i in range(num_channel)]) - set(indices_stayed))
 
-    elif method == 'lasso': 
+    if method == 'lasso': 
         y = module(inputs)
 
         if module.bias is not None:  # bias.shape = [N]
@@ -87,21 +88,25 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
             bias = 0.
         y = y.view(-1).data.cpu().numpy()  # flatten all of outputs
         y_channel_spread = []
+        
         for i in range(num_channel):
             x_channel_i = torch.zeros_like(inputs)
             x_channel_i[:, i, ...] = inputs[:, i, ...]
             y_channel_i = module(x_channel_i) - bias
             y_channel_spread.append(y_channel_i.data.view(-1, 1))
         y_channel_spread = torch.cat(y_channel_spread, dim=1).cpu()
+            
+        if num_pruned <= 33:
+            alpha = 1e-5
+        elif num_pruned <= 66:
+            alpha = 1e-6
+        elif num_pruned <= 131:
+            alpha = 1e-7
+        else:
+            alpha = 1e-8
 
-        alpha = 1e-7
-        solver = Lasso(alpha=alpha, warm_start=True, selection='random', random_state=0)
-
-        # choice_idx = np.random.choice(y_channel_spread.size()[0], 2000, replace=False)
-        # selected_y_channel_spread = y_channel_spread[choice_idx, :]
-        # new_output = y[choice_idx]
-        #
-        # del y_channel_spread, y
+        max_iter = 1
+        solver = Lasso(alpha=alpha, warm_start=True, selection='random', random_state=0, max_iter=max_iter)
 
         # 원하는 수의 채널이 삭제될 때까지 alpha 값을 조금씩 늘려나감
         alpha_l, alpha_r = 0, alpha
@@ -112,7 +117,6 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
             c += 1
             alpha_r *= 2
             solver.alpha = alpha_r
-            # solver.fit(selected_y_channel_spread, new_output)
             solver.fit(y_channel_spread,y)
             num_pruned_try = sum(solver.coef_ == 0)
 
@@ -126,7 +130,6 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
             c+=1
             alpha = (alpha_l + alpha_r) / 2
             solver.alpha = alpha
-            # solver.fit(selected_y_channel_spread, new_output)
             solver.fit(y_channel_spread,y)
             num_pruned_try = sum(solver.coef_ == 0)
 
@@ -134,6 +137,9 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
                 alpha_r = alpha
             elif num_pruned_try < num_pruned:
                 alpha_l = alpha
+            elif time.time() - start > 3:
+                print(f"still {num_pruned_try}, should prune {num_pruned}....{time.time() - start}min")
+                break
             else:
                 break
         print(solver.alpha, num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min =========")

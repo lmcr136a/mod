@@ -55,5 +55,6 @@ if __name__ == '__main__':
             main(cfg, args.force_gpu)
             print(f"Total running time: {round((time.time() - start)/3600, 3)} hour")
     else:
+        print("이게아닌뎅")
         main(args.config)
     
