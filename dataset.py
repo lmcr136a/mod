@@ -15,12 +15,16 @@ from torch.utils.data import DataLoader
 
 
 
-def get_dataloader(cfg, for_test=False, get_only_targets=False):
+def get_dataloader(cfg, for_test=False, get_only_targets=None):
     cfg_data = cfg["data"]
+
     if for_test:
         flag="for_test"
     else:
         flag="for_trainNval"
+
+    if get_only_targets is None:
+        get_only_targets = cfg_data["target_"+flag]
 
     target_classes=cfg_data.get("target_classes", None)
 
@@ -29,6 +33,8 @@ def get_dataloader(cfg, for_test=False, get_only_targets=False):
         return CifarDataLoader(cfg, 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
     elif cfg_data[flag] == "CIFAR100":
         return CifarDataLoader(cfg, 100, get_only_targets=get_only_targets, target_classes=target_classes), max(100, len(target_classes))
+    elif cfg_data[flag] == "IMAGENET":
+        return InversionDataLoader(cfg, 'imagenet', 1000, get_only_targets=get_only_targets, target_classes=target_classes, imagenet=True), max(1000, len(target_classes))
     elif cfg_data[flag] == "NINV10":
         return InversionDataLoader(cfg, 'ninv', 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
     elif cfg_data[flag] == "NINV100":
@@ -36,12 +42,13 @@ def get_dataloader(cfg, for_test=False, get_only_targets=False):
     elif cfg_data[flag] == "DINV10":
         return InversionDataLoader(cfg, 'dinv', 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
     elif cfg_data[flag] == "DINV1000":
-        return InversionDataLoader(cfg, 'dinv', 10, get_only_targets=get_only_targets, target_classes=target_classes), max(10, len(target_classes))
+        return InversionDataLoader(cfg, 'dinv', 1000, get_only_targets=get_only_targets, target_classes=target_classes), max(1000, len(target_classes))
 
 
-def get_test_dataloader(cfg, dataloader, get_only_targets=False):
+def get_test_dataloader(cfg, dataloader, get_only_targets=True):
     cfg_data = cfg["data"]
-    if cfg_data["for_test"] == cfg_data["for_trainNval"]:
+    if cfg_data["for_test"] == cfg_data["for_trainNval"]\
+        and cfg_data['target_for_test'] == cfg_data['target_for_trainNval']:
         pass
     else:
         test_loader, _ = get_dataloader(cfg, for_test=True, get_only_targets=get_only_targets)
@@ -59,7 +66,10 @@ class CifarDataLoader:
         random.seed(config.get("seed", 9099))
         np.random.seed(config.get("seed", 9099))
         self.config = config
-        self.logger = logging.getLogger(f"Cifar{class_num}DataLoader")
+        if class_num == 1000:
+            print(f"Imagenet DataLoader")
+        else:
+            print(f"Cifar{class_num} Dataloader")
 
 
         data_transformer = transforms.Compose([transforms.ToTensor()])
@@ -100,13 +110,13 @@ class CifarDataLoader:
 
 
         if target_classes and get_only_targets:
-            print("CIFAR DATALOADER FOR CLASS: ", target_classes)
+            print("DATALOADER FOR CLASS: ", target_classes)
             for dataset in [train_set, valid_set, test_set]:
                 idx = torch.Tensor([i for i, v in enumerate(dataset.targets) if v in target_classes]).long()
                 dataset.targets = torch.Tensor(dataset.targets)[idx]
                 dataset.data = torch.Tensor(dataset.data)[idx].cpu().detach().numpy().astype(np.uint8)
         else:
-            print("CIFAR DATALOADER FOR ALL CLASS")
+            print("DATALOADER FOR ALL CLASS")
 
 
         self.train_loader = DataLoader(train_set, batch_size=self.config.get("batch_size", 128), shuffle=True,
@@ -122,7 +132,7 @@ class CifarDataLoader:
 
 
 class InversionDataLoader:
-    def __init__(self, config, dirname, class_num, get_only_targets, target_classes):
+    def __init__(self, config, dirname, class_num, get_only_targets, target_classes, imagenet=False):
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
         torch.manual_seed(config["run"].get("seed", 9099))
@@ -130,37 +140,52 @@ class InversionDataLoader:
         random.seed(config["run"].get("seed", 9099))
         np.random.seed(config["run"].get("seed", 9099))
         self.config = config["run"]
-        self.logger = logging.getLogger(f"{dirname} cifar{class_num} dataloader")
+        print(f"{dirname} cifar{class_num} dataloader")
 
-        if "resnet" in config["network"]["model"]:
-            data_path = f'./data/{dirname}/{config["data"]["for_test"].lower()}_r{config["network"]["model"][-2:]}/'
-        else:
-            pass
-        
+
         data_transformer = transforms.Compose([transforms.ToTensor()])
-        train_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)
-        valid_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)
-        test_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)
+        
+        if imagenet:
+            train_set = datasets.ImageFolder("./data/imagenet/train", transform=data_transformer)
+            valid_set = datasets.ImageFolder("./data/imagenet/val", transform=data_transformer)
+            test_set = datasets.ImageFolder("./data/imagenet/test", transform=data_transformer)
+        else:
+            if "resnet" in config["network"]["model"]:
+                data_path = f'./data/{dirname}/{config["data"]["for_test"].lower()}_r{config["network"]["model"][-2:]}/'
+            else:
+                pass
+            train_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)
+            valid_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)
+            test_set = datasets.ImageFolder(data_path+"train", transform=data_transformer)
 
-        tmean, tstd = get_mean_std(train_set)
-        vmean, vstd = get_mean_std(valid_set)
-        testmean, teststd = get_mean_std(test_set)
+        if imagenet:
+            tmean, tstd = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+            vmean, vstd = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+            testmean, teststd = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225]
+        else:
+            tmean, tstd = get_mean_std(train_set)
+            vmean, vstd = get_mean_std(valid_set)
+            testmean, teststd = get_mean_std(test_set)
+
+        if class_num == 1000:
+            tfs = [transforms.Resize(256), transforms.CenterCrop(224)]
+        else:
+            tfs = [transforms.RandomCrop(32, padding=4)]
         
         # mean, std = [0.5071, 0.4867, 0.4408], [0.2675, 0.2565, 0.2761]
         # tmean, tstd, vmean, vstd, testmean, teststd = mean, std, mean, std, mean, std
 
-        train_set.transform = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
+        train_set.transform = transforms.Compose(tfs+[
             transforms.RandomHorizontalFlip(),
             transforms.RandomRotation(15),
             transforms.ToTensor(),
             transforms.Normalize(tmean, tstd)])
 
-        valid_set.transform = transforms.Compose([
+        valid_set.transform = transforms.Compose(tfs+[
             transforms.ToTensor(),
             transforms.Normalize(vmean, vstd)])
 
-        test_set.transform = transforms.Compose([
+        test_set.transform = transforms.Compose(tfs+[
             transforms.ToTensor(),
             transforms.Normalize(testmean, teststd)])
 

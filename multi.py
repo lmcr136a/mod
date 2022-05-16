@@ -1,24 +1,21 @@
-# import multiprocessing as m
-# import time
+import os
+import shutil
+import numpy as np
+from random import sample
 
-# def function(x, y):
-#     for i in range(10**8):
-#         y += 1
-#         x += 1
-#     return [1,2,3]
+pth = 'data/imagenet/train/'
+# for i in range(1000):
+#     file_list = [name for name in os.listdir(pth+str(i))]
+#     for name in file_list:
+#         os.rename(pth+f"{i}/"+name, 'data/imagenet/train/'+f"{i}/"+name)
 
-# def merge_pool(args):
-#     x, y = args[0], args[1]
-#     return function(x, y)
-    
-# p = m.Pool(16)   
-# start = time.time() 
-# print(p.map(merge_pool, [[1,1], [2,1]]))
-# print(time.time()- start)
+for class_idx in range(1000):
+    cls_dir = pth+str(class_idx)+"/"
+    new_class_dir = f"data/imagenet/val/{class_idx}/"
+    if not os.path.exists(new_class_dir):
+        os.makedirs(new_class_dir)
 
-
-
-# start = time.time() 
-# print(function(1, 1))
-# print(function(2, 1))
-# print(time.time()- start)
+    names = [name for name in os.listdir(cls_dir)]
+    names_to_move = sample(names, 100)
+    for filename in names_to_move:
+        shutil.move(cls_dir+filename, new_class_dir+filename)

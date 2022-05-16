@@ -374,83 +374,141 @@ class AssembleNetResNet(BaseAgent):
         self.original_conv_output = dict()  # clear original output to save cuda memory
 
 
-    def lasso_compress(self, p_cfg, log_dir):
-        k = p_cfg["k"]
-        saved_index = p_cfg['lasso'].get("saved_index", None)
+    # def lasso_compress(self, p_cfg, log_dir):
+    #     k = p_cfg["k"]
+    #     saved_index = p_cfg['lasso'].get("saved_index", None)
+    #     # batch = l_cfg.get("batch", None)
+    #     print(f'THIS IS LASSO COMPRESS!!!!! k:{k}!!!!!!!!!!!')
+
+    #     if not saved_index:
+    #         total_indices_stayed = [[] for i in range(len(self.all_list))]
+    #         inputs, _ = next(iter(self.data_loader.train_loader))
+    #         if self.cuda:
+    #             inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
+    #         self.record_conv_output(inputs)
+    #         x = inputs
+    #         for i, m in enumerate(self.all_list):
+    #             if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+    #                 conv1 = self.named_modules_list[str(i)].conv1
+    #                 bn1 = self.named_modules_list[str(i)].bn1
+    #                 conv2 = self.named_modules_list[str(i)].conv2
+    #                 input_feature = torch.relu(bn1(conv1(x)))
+                    
+    #                 indices_stayed, indices_pruned = channel_selection(input_feature, conv2, sparsity=(1.-k), method='lasso')
+            
+    #                 module_surgery(conv1, bn1, conv2, indices_stayed)
+    #                 pruned_input_feature = torch.relu(bn1(conv1(x)))
+    #                 output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
+    #                 weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
+    #                 total_indices_stayed[i].append(indices_stayed)
+    #             elif isinstance(m, torch.nn.Linear):
+    #                 break
+    #             x = m(x)
+    #         torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
+
+    #     else:
+    #         print("LOADING SAVED INEDX...mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmnmnmnmnnnnnn")
+    #         total_indices_stayed = torch.load(saved_index)
+
+    #         total_indices_stayed = self.get_total_top_indices(total_indices_stayed)
+    #         print(total_indices_stayed)
+
+
+    #         inputs, _ = next(iter(self.data_loader.train_loader))
+    #         if self.cuda:
+    #             inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
+    #         self.record_conv_output(inputs)
+    #         x = inputs
+    #         for i, m in enumerate(self.all_list):
+    #             if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+    #                 conv1 = self.named_modules_list[str(i)].conv1
+    #                 bn1 = self.named_modules_list[str(i)].bn1
+    #                 conv2 = self.named_modules_list[str(i)].conv2
+    #                 input_feature = torch.relu(bn1(conv1(x)))
+                    
+    #                 indices_stayed = total_indices_stayed[i]
+                    
+    #                 module_surgery(conv1, bn1, conv2, indices_stayed)
+    #                 pruned_input_feature = torch.relu(bn1(conv1(x)))
+    #                 output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
+    #                 weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
+    #             elif isinstance(m, torch.nn.Linear):
+    #                 break
+    #             x = m(x)
+    #     self.original_conv_output = dict()  # clear original output to save cuda memory
+    
+    def lasso_compress(self, p_cfg, log_dir, save_i=0):
+        self.k = p_cfg["k"]
+        saved_index = p_cfg['lasso'].get(f"saved_index_{save_i}", None)
         # batch = l_cfg.get("batch", None)
-        print(f'THIS IS LASSO COMPRESS!!!!! k:{k}!!!!!!!!!!!')
-
-        # if batch:
-        #     concated_input = torch.Tensor([])
-        #     for inputs, label in (self.data_loader.train_loader):
-        #         concated_input = torch.cat((concated_input, inputs), 0)
-        #     if self.cuda:
-        #         concated_input = concated_input.cuda(non_blocking=self.config.get("async_loading", True))
-        #     concated_input = torch.split(concated_input, batch, dim=0)
-        #     print(len(concated_input))
-        #     loader = zip(concated_input, [0]*len(concated_input))
-        # else:        
-        loader = self.data_loader.train_loader
-        
-
+        print(f'THIS IS LASSO COMPRESS!!!!! k:{self.k}!!!!!!!!!!!')
         if not saved_index:
             total_indices_stayed = [[] for i in range(len(self.all_list))]
+            p = torch.multiprocessing.Pool(p_cfg['process_num'])
             inputs, _ = next(iter(self.data_loader.train_loader))
             if self.cuda:
                 inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
-            self.record_conv_output(inputs)
             x = inputs
+
+            map_list = []
             for i, m in enumerate(self.all_list):
                 if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
-                    conv1 = self.named_modules_list[str(i)].conv1
-                    bn1 = self.named_modules_list[str(i)].bn1
-                    conv2 = self.named_modules_list[str(i)].conv2
-                    input_feature = torch.relu(bn1(conv1(x)))
-                    
-                    indices_stayed, indices_pruned = channel_selection(input_feature, conv2, sparsity=(1.-k), method='lasso')
-            
-                    module_surgery(conv1, bn1, conv2, indices_stayed)
-                    pruned_input_feature = torch.relu(bn1(conv1(x)))
-                    output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
-                    weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
-                    total_indices_stayed[i].append(indices_stayed)
+                    map_list.append([i, m, x.detach()])
                 elif isinstance(m, torch.nn.Linear):
                     break
                 x = m(x)
-            torch.save(total_indices_stayed, log_dir+"/total_indices_stayed.pt")
+
+            indices = p.map(self.merge_pool, map_list)
+            c=0
+            for i, m in indices:
+                print(i, m)
+                total_indices_stayed[i].append(m)
+                c+=1
+            torch.save(total_indices_stayed, log_dir+f"/total_indices_stayed_{save_i}.pt")
 
         else:
             print("LOADING SAVED INEDX...mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmnmnmnmnnnnnn")
             total_indices_stayed = torch.load(saved_index)
 
-            total_indices_stayed = self.get_total_top_indices(total_indices_stayed)
-            print(total_indices_stayed)
+        total_indices_stayed = self.get_total_top_indices(total_indices_stayed)
+        print(total_indices_stayed)
 
 
-            inputs, _ = next(iter(self.data_loader.train_loader))
-            if self.cuda:
-                inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
-            self.record_conv_output(inputs)
-            x = inputs
-            for i, m in enumerate(self.all_list):
-                if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
-                    conv1 = self.named_modules_list[str(i)].conv1
-                    bn1 = self.named_modules_list[str(i)].bn1
-                    conv2 = self.named_modules_list[str(i)].conv2
-                    input_feature = torch.relu(bn1(conv1(x)))
-                    
-                    indices_stayed = total_indices_stayed[i]
-                    
-                    module_surgery(conv1, bn1, conv2, indices_stayed)
-                    pruned_input_feature = torch.relu(bn1(conv1(x)))
-                    output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
-                    weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
-                elif isinstance(m, torch.nn.Linear):
-                    break
-                x = m(x)
+        inputs, _ = next(iter(self.data_loader.train_loader))
+        if self.cuda:
+            inputs = inputs.cuda(non_blocking=self.config.get("async_loading", True))
+        self.record_conv_output(inputs)
+        x = inputs
+        for i, m in enumerate(self.all_list):
+            if isinstance(m, models.resnet_cifar.BasicBlock) or isinstance(m, models.resnet_imagenet.BasicBlock):
+                conv1 = self.named_modules_list[str(i)].conv1
+                bn1 = self.named_modules_list[str(i)].bn1
+                conv2 = self.named_modules_list[str(i)].conv2
+                input_feature = torch.relu(bn1(conv1(x)))
+                
+                indices_stayed = total_indices_stayed[i]
+                
+                module_surgery(conv1, bn1, conv2, indices_stayed)
+                pruned_input_feature = torch.relu(bn1(conv1(x)))
+                output_feature = self.original_conv_output[str(i) + '.conv2'].cuda() if self.cuda else self.original_conv_output[str(i) + '.conv2']
+                weight_reconstruction(conv2, pruned_input_feature, output_feature, use_gpu=self.cuda)
+            elif isinstance(m, torch.nn.Linear):
+                break
+            x = m(x)
         self.original_conv_output = dict()  # clear original output to save cuda memory
-    
+        
+    def get_indices(self, i, m, x):
+        conv1 = self.named_modules_list[str(i)].conv1
+        bn1 = self.named_modules_list[str(i)].bn1
+        conv2 = self.named_modules_list[str(i)].conv2
+        input_feature = torch.relu(bn1(conv1(x)))
+        
+        indices_stayed, indices_pruned = channel_selection(input_feature, conv2, sparsity=(1.-self.k), method='lasso')
+        return indices_stayed
 
+    def merge_pool(self, args):
+        i, m, x = args[0], args[1], args[2]
+        return i, self.get_indices(i, m, x)
 
     def get_total_top_indices(self, total_indices_stayed, k=None):
         output = []

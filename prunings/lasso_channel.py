@@ -76,7 +76,9 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
 
     #     indices_pruned = list(set([i for i in range(num_channel)]) - set(indices_stayed))
 
-    if method == 'lasso': 
+
+
+    if method == 'lasso':
         y = module(inputs)
 
         if module.bias is not None:  # bias.shape = [N]
@@ -88,48 +90,38 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
             bias = 0.
         y = y.view(-1).data.cpu().numpy()  # flatten all of outputs
         y_channel_spread = []
-        
         for i in range(num_channel):
             x_channel_i = torch.zeros_like(inputs)
             x_channel_i[:, i, ...] = inputs[:, i, ...]
             y_channel_i = module(x_channel_i) - bias
             y_channel_spread.append(y_channel_i.data.view(-1, 1))
         y_channel_spread = torch.cat(y_channel_spread, dim=1).cpu()
-            
-        if num_pruned <= 33:
-            alpha = 1e-5
-        elif num_pruned <= 66:
-            alpha = 1e-6
-        elif num_pruned <= 131:
-            alpha = 1e-7
-        else:
-            alpha = 1e-8
 
-        max_iter = 1
-        solver = Lasso(alpha=alpha, warm_start=True, selection='random', random_state=0, max_iter=max_iter)
+        alpha = 1e-7
+        solver = Lasso(alpha=alpha, warm_start=True, selection='random', random_state=0)
+
+        # choice_idx = np.random.choice(y_channel_spread.size()[0], 2000, replace=False)
+        # selected_y_channel_spread = y_channel_spread[choice_idx, :]
+        # new_output = y[choice_idx]
+        #
+        # del y_channel_spread, y
 
         # 원하는 수의 채널이 삭제될 때까지 alpha 값을 조금씩 늘려나감
         alpha_l, alpha_r = 0, alpha
         num_pruned_try = 0
-        c = -1
-        start = time.time()
         while num_pruned_try < num_pruned:
-            c += 1
             alpha_r *= 2
             solver.alpha = alpha_r
+            # solver.fit(selected_y_channel_spread, new_output)
             solver.fit(y_channel_spread,y)
             num_pruned_try = sum(solver.coef_ == 0)
 
         # 충분하게 pruning 되는 alpha 를 찾으면, 이후 alpha 값의 좌우를 좁혀 나가면서 좀 더 정확한 alpha 값을 찾음
         num_pruned_max = int(num_pruned)
-        print(solver.alpha, num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min, start finding coef")
-
-        c = -1
-        start = time.time()
         while True:
-            c+=1
             alpha = (alpha_l + alpha_r) / 2
             solver.alpha = alpha
+            # solver.fit(selected_y_channel_spread, new_output)
             solver.fit(y_channel_spread,y)
             num_pruned_try = sum(solver.coef_ == 0)
 
@@ -137,12 +129,80 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
                 alpha_r = alpha
             elif num_pruned_try < num_pruned:
                 alpha_l = alpha
-            elif time.time() - start > 3:
-                print(f"still {num_pruned_try}, should prune {num_pruned}....{time.time() - start}min")
-                break
             else:
                 break
-        print(solver.alpha, num_pruned, "  c = ", c, "time: ", round((time.time() - start)/60, 3), "min =========")
+
+
+
+
+    # if method == 'lasso': 
+    #     y = module(inputs)
+
+    #     if module.bias is not None:  # bias.shape = [N]
+    #         bias_size = [1] * y.dim()  # bias_size: [1, 1, 1, 1]
+    #         bias_size[1] = -1  # [1, -1, 1, 1]
+    #         bias = module.bias.view(bias_size)  # bias.view([1, -1, 1, 1] = [1, N, 1, 1])
+    #         y -= bias  # output feature 에서 bias 만큼을 빼줌 (y - b)
+    #     else:
+    #         bias = 0.
+    #     y = y.view(-1).data.cpu().numpy()  # flatten all of outputs
+    #     y_channel_spread = []
+        
+    #     for i in range(num_channel):
+    #         x_channel_i = torch.zeros_like(inputs)
+    #         x_channel_i[:, i, ...] = inputs[:, i, ...]
+    #         y_channel_i = module(x_channel_i) - bias
+    #         y_channel_spread.append(y_channel_i.data.view(-1, 1))
+    #     y_channel_spread = torch.cat(y_channel_spread, dim=1).cpu()
+            
+    #     if num_pruned <= 33:
+    #         alpha = 1e-5
+    #     elif num_pruned <= 66:
+    #         alpha = 1e-6
+    #     elif num_pruned <= 131:
+    #         alpha = 1e-7
+    #     else:
+    #         alpha = 1e-8
+
+    #     max_iter = 5  # default: 1000
+    #     tol = 1e-4  # default: 1e-4
+    #     solver = Lasso(alpha=alpha, warm_start=True, selection='random', random_state=0, max_iter=max_iter)
+
+    #     # 원하는 수의 채널이 삭제될 때까지 alpha 값을 조금씩 늘려나감
+    #     alpha_l, alpha_r = 0, alpha
+    #     num_pruned_try = 0
+    #     c = -1
+    #     start = time.time()
+    #     while num_pruned_try < num_pruned:
+    #         c += 1
+    #         alpha_r *= 2
+    #         solver.alpha = alpha_r
+    #         solver.fit(y_channel_spread,y)
+    #         num_pruned_try = sum(solver.coef_ == 0)
+
+    #     # 충분하게 pruning 되는 alpha 를 찾으면, 이후 alpha 값의 좌우를 좁혀 나가면서 좀 더 정확한 alpha 값을 찾음
+    #     num_pruned_max = int(num_pruned)
+    #     print(str(solver.alpha).center(40), num_pruned, f"c={c} {round((time.time() - start)/60, 3)}min".center(30))
+
+    #     c = -1
+    #     while True:
+    #         c+=1
+    #         alpha = (alpha_l + alpha_r) / 2
+    #         solver.alpha = alpha
+    #         solver.fit(y_channel_spread,y)
+    #         num_pruned_try = sum(solver.coef_ == 0)
+
+    #         if num_pruned_try > num_pruned_max:
+    #             alpha_r = alpha
+    #         elif num_pruned_try < num_pruned:
+    #             alpha_l = alpha
+    #         elif num_pruned_try == num_pruned:
+    #             break
+            
+    #         # if round((time.time() - start)/60, 3) > 10:
+    #         #     print(f"still {num_pruned_try}, should prune {num_pruned}....{round((time.time() - start)/60, 3)}min")
+    #         #     break
+    #     print(str(solver.alpha).center(40), num_pruned, f"c={c} {round((time.time() - start)/60, 3)}min =========".center(30))
 
         # 마지막으로, lasso coeff를 index로 변환
         indices_stayed = np.where(solver.coef_ != 0)[0].tolist()

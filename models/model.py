@@ -9,8 +9,8 @@ from .vgg_chip import vgg_16_bn_chip
 from .vgg_gal import vgg_16_bn_gal
 from .vgg_hrank import vgg_16_bn_hrank
 # from .resnet_gal_imagenet import resnet34_gal, resnet50_gal
-
-def get_resnet(cfg_network, n_class, sparsity):
+import torchvision.models as models
+def get_resnet(cfg_network, n_class, sparsity, imagenet=False):
     model_name = cfg_network["model"]
 
     if cfg_network.get("pruning", False) and (cfg_network["pruning"].get("chip", False) or cfg_network["pruning"].get("hrank", False) or cfg_network["pruning"].get("gal", False)) :
@@ -28,7 +28,8 @@ def get_resnet(cfg_network, n_class, sparsity):
             model_name = model_name +"_chip"
             print("[ NETWORK ] ", model_name)
             return eval(model_name)(num_classes=n_class, sparsity=sparsity)
-
+    if 'imagenet' in cfg_network['load_state']:
+        return models.resnet34(pretrained=True)
     print("[ NETWORK ] ", model_name)
     return {
         "resnet20": resnet20(n_class),

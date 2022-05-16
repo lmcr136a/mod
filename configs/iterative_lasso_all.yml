@@ -1,6 +1,6 @@
 data:
-  for_trainNval: CIFAR10
-  for_test: CIFAR10
+  for_trainNval: CIFAR100
+  for_test: CIFAR100
 
   train:
     augmentation: null
@@ -18,15 +18,16 @@ data:
     n_workers: 4
     pin_memory: true
     shuffle: false
-  target_classes: [0, 1, 2]
+  target_classes: [0, 1, 2, 3, 4]
 
 network: 
   model: resnet34
-  load_state: models/pretrained/resnet34_cifar10.pt
+  load_state: models/pretrained/resnet34_cifar100.pt
   
   pruning:
-    k: 0.49
-    all_classes: true  # 기본 compress: True ,  saved_index 관련 없음             
+    k: 0.48
+    process_num: 3
+    all_classes: True  # 기본 compress: True ,  saved_index 관련 없음          
     iterative_lasso: True
     lasso:
       saved_index: #experiments/lasso_012_r56_inv10/total_indices_stayed.pt
@@ -35,11 +36,11 @@ network:
 run:
   seed: 9099
   gpu_device: 1
-  epoch: 5
-  iter_num: 6
+  epoch: 15
+  iter_num: 4
   figure_interval: 50
   plot_interval: 10
-  print_interval: 1
+  print_interval: 5
   val_interval: 5
 
   loss: crossentropy
