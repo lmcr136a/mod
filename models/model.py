@@ -28,7 +28,7 @@ def get_resnet(cfg_network, n_class, sparsity, imagenet=False):
             model_name = model_name +"_chip"
             print("[ NETWORK ] ", model_name)
             return eval(model_name)(num_classes=n_class, sparsity=sparsity)
-    if 'imagenet' in cfg_network['load_state']:
+    if  cfg_network['load_state'] and 'imagenet' in cfg_network['load_state']:
         return models.resnet34(pretrained=True)
     print("[ NETWORK ] ", model_name)
     return {
@@ -42,6 +42,7 @@ def get_resnet(cfg_network, n_class, sparsity, imagenet=False):
         "resnet34": resnet34(n_class),
         "resnet50": resnet50(n_class),
         "resnet101": resnet101(n_class),
+        "vgg_16_bn": vgg_16_bn_chip(num_classes=n_class, sparsity=0)
     }[model_name]
 
 

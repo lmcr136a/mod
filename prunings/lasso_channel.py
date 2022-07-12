@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 from sklearn.linear_model import Lasso
 from scipy.spatial import distance
+from utils.utils import num_
 
 num_pruned_tolerate_coeff = 1.1
 
@@ -24,7 +25,6 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
     num_pruned = int(math.ceil(num_channel * sparsity))  # 입력된 sparsity 에 맞춰 삭제되어야 하는 채널 수
     num_stayed = num_channel - num_pruned
 
-    print('num_pruned', num_pruned)
     # if method == 'greedy':
     #     indices_pruned = []
     #     while len(indices_pruned) < num_pruned:
@@ -78,6 +78,7 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
 
 
 
+
     if method == 'lasso':
         y = module(inputs)
 
@@ -100,30 +101,31 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
         alpha = 1e-7
         solver = Lasso(alpha=alpha, warm_start=True, selection='random', random_state=0)
 
-        # choice_idx = np.random.choice(y_channel_spread.size()[0], 2000, replace=False)
-        # selected_y_channel_spread = y_channel_spread[choice_idx, :]
-        # new_output = y[choice_idx]
-        #
-        # del y_channel_spread, y
-
         # 원하는 수의 채널이 삭제될 때까지 alpha 값을 조금씩 늘려나감
         alpha_l, alpha_r = 0, alpha
         num_pruned_try = 0
+
         while num_pruned_try < num_pruned:
             alpha_r *= 2
             solver.alpha = alpha_r
-            # solver.fit(selected_y_channel_spread, new_output)
             solver.fit(y_channel_spread,y)
             num_pruned_try = sum(solver.coef_ == 0)
 
         # 충분하게 pruning 되는 alpha 를 찾으면, 이후 alpha 값의 좌우를 좁혀 나가면서 좀 더 정확한 alpha 값을 찾음
         num_pruned_max = int(num_pruned)
+
+        count = 0
         while True:
+            count += 1
+            # print("second while count: ", count, "  num pruned: ", num_pruned, "  num_pruned_try: ", num_pruned_try)
             alpha = (alpha_l + alpha_r) / 2
             solver.alpha = alpha
-            # solver.fit(selected_y_channel_spread, new_output)
             solver.fit(y_channel_spread,y)
             num_pruned_try = sum(solver.coef_ == 0)
+
+            if count > 30:
+                print("count > threshold", "  num pruned: ", num_pruned, "  num_pruned_try: ", num_pruned_try)
+                break
 
             if num_pruned_try > num_pruned_max:
                 alpha_r = alpha
@@ -211,8 +213,8 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
     else:
         raise NotImplementedError
 
-    inputs = inputs.cuda()
-    module = module.cuda()
+    # inputs = inputs.cuda()
+    # module = module.cuda()
 
     return indices_stayed, indices_pruned  # 선택된 채널의 인덱스를 리턴
 
@@ -314,6 +316,8 @@ def weight_reconstruction(module, inputs, outputs, use_gpu=False):
     if use_gpu:
         # param = param.cuda()
         param = torch.from_numpy(param).cuda()
+    else:
+        param = torch.from_numpy(param)
 
     param = param[0:x.size(1), :].clone().t().contiguous().view(y.size(1), -1)
     if isinstance(module, torch.nn.Conv2d):

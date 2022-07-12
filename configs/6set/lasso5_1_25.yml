@@ -1,0 +1,55 @@
+data:
+  for_test: CIFAR100
+  for_trainNval: CIFAR100
+  target_classes:
+  - 63
+  - 95
+  - 2
+  - 73
+  - 14
+  target_for_test: true
+  target_for_trainNval: true
+  test:
+    batch_size: 128
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+  train:
+    augmentation: null
+    batch_size: 128
+    n_workers: 8
+    pin_memory: true
+    shuffle: true
+  val:
+    batch_size: 128
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+network:
+  load_state: models/pretrained/resnet34_cifar100.pt
+  model: resnet34
+  pruning:
+    all_classes: false
+    k: 0.25
+    lasso:
+      saved_index: null
+    process_num: 6
+run:
+  epoch: 50
+  figure_interval: 50
+  gpu_device: 1
+  loss: crossentropy
+  optimizer:
+    gamma: 0.9
+    lr: 5.0e-05
+    milestones:
+    - 5
+    - 10
+    - 15
+    momentum: 0.9
+    name: adam
+    weight_decay: 0.0005
+  plot_interval: 10
+  print_interval: 10
+  seed: 9099
+  val_interval: 25

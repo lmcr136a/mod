@@ -3,7 +3,7 @@ import argparse
 import warnings
 warnings.filterwarnings('ignore')
 
-from utils.utils import configuration, show_test_acc
+from utils.utils import configuration, show_test_acc, write_result
 from run import run
 import time
 import torch
@@ -12,6 +12,9 @@ def main(cfg_dir, force_gpu=None):
     cfg, writer = configuration(cfg_dir, force_gpu)
 
     run(cfg, writer)
+    
+    time.sleep(10)
+    write_result(writer.log_dir)
     
     sys.stdout = sys.__stdout__
 
@@ -55,6 +58,5 @@ if __name__ == '__main__':
             main(cfg, args.force_gpu)
             print(f"Total running time: {round((time.time() - start)/3600, 3)} hour")
     else:
-        print("이게아닌뎅")
         main(args.config)
     

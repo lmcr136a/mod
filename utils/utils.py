@@ -18,7 +18,7 @@ def num_(number):
         return f"{number}"
 
 
-def configuration(config, force_gpu):
+def configuration(config, force_gpu, jupyter=False):
     """
     input: path of .yml file
     output: dictionary of configurations
@@ -34,15 +34,33 @@ def configuration(config, force_gpu):
     KST = timezone('Asia/Seoul')
     now = datetime.datetime.utcnow()
     t = utc.localize(now).astimezone(KST)
-    tb_dir = f'experiments/___{config.split(".")[0]}_{cfg["network"]["model"]}_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
+    # tb_dir = f'experiments/___{config.split(".")[0]}_{cfg["network"]["model"]}_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
+    tb_dir = f'experiments/{config.split(".")[0]}' #_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
     writer = SummaryWriter(tb_dir)
-    f = open(tb_dir+"/log.txt", 'w')
-    sys.stdout = f
+    if not jupyter:
+        f = open(tb_dir+"/log.txt", 'w')
+        sys.stdout = f
 
-    with open(tb_dir+"/"+config, "w") as f:
-        yaml.dump(cfg, f)
+        with open(tb_dir+"/"+config, "w") as f:
+            yaml.dump(cfg, f)
 
     return cfg, writer
+
+def write_result(log_dir):
+    with open(log_dir+"/log.txt", encoding="utf-8") as fp:
+        result_log = fp.read()
+    KST = timezone('Asia/Seoul')
+    now = datetime.datetime.utcnow()
+    t = utc.localize(now).astimezone(KST)
+    time_info = f'{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
+
+    result_log = result_log[-160:-140]
+    result_log = log_dir.split("/")[-1] + f"   {time_info}:     " + result_log + "\n\n"
+
+    with open("result_summary.txt", 'a') as rf:
+        rf.write(result_log)
+        
+
 
 def show_test_acc(result):
     print('\n==========================================================')
@@ -91,16 +109,15 @@ def format_time(seconds):
     return f
 
 
-_, term_width = os.popen('stty size', 'r').read().split()
-term_width = int(term_width)
-
-TOTAL_BAR_LENGTH = 65.
-last_time = time.time()
-begin_time = last_time
-
 
 def progress_bar(current, total, msg=None):
-    global last_time, begin_time
+    
+    _, term_width = os.popen('stty size', 'r').read().split()
+    term_width = int(term_width)
+
+    TOTAL_BAR_LENGTH = 65.
+    last_time = time.time()
+    begin_time = last_time
     if current == 0:
         begin_time = time.time()  # Reset for new bar.
 

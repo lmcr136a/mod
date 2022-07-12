@@ -26,7 +26,7 @@ def get_dataloader(cfg, for_test=False, get_only_targets=None):
     if get_only_targets is None:
         get_only_targets = cfg_data["target_"+flag]
 
-    target_classes=cfg_data.get("target_classes", None)
+    target_classes=cfg_data.get("target_classes", [])
 
     print(flag, ":    ", cfg_data[flag])
     if cfg_data[flag] == "CIFAR10":
@@ -108,6 +108,9 @@ class CifarDataLoader:
             transforms.ToTensor(),
             transforms.Normalize(testmean, teststd)])
 
+        if 'random' in str(target_classes):  # random10 or random20
+            num = int(target_classes[-2:])
+            target_classes = np.random.randint(0, class_num, num)
 
         if target_classes and get_only_targets:
             print("DATALOADER FOR CLASS: ", target_classes)

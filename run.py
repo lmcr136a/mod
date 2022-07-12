@@ -69,6 +69,8 @@ def run(cfg, writer):
         elif cfg["network"]["pruning"].get("twinkle", None):
             twinkle(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir, device)
 
+        network = network.to(torch.device("cuda"))
+        
         summary(network, torch.zeros((2, 3, 32, 32)).to(torch.device("cuda")))
         show_profile(network)
         show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
