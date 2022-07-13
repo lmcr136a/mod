@@ -21,7 +21,7 @@ data:
     n_workers: 4
     pin_memory: true
     shuffle: false
-  # target_classes: [0, 1, 2]
+  target_classes: [0, 1, 2, 3, 4]
 
 network: 
   model: vgg_16_bn

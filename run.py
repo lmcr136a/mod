@@ -27,7 +27,7 @@ def run(cfg, writer):
     cfg_run = cfg["run"]
     dataloader, n_class = get_dataloader(cfg)
     get_test_dataloader(cfg, dataloader, get_only_targets=True)
-    network = get_network(cfg["network"], n_class)
+    network = get_network(cfg["network"], n_class, target_classes=cfg['data'].get('target_classes', None))
 
     device = is_cuda()
     np.random.seed(cfg_run["seed"])
@@ -52,7 +52,7 @@ def run(cfg, writer):
     show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
     ################################################################
 
-    summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
+    # summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
     show_profile(network)
 
     if cfg["network"].get("pruning", None):
@@ -71,12 +71,12 @@ def run(cfg, writer):
 
         network = network.to(torch.device("cuda"))
         
-        summary(network, torch.zeros((2, 3, 32, 32)).to(torch.device("cuda")))
+        # summary(network, torch.zeros((2, 3, 32, 32)).to(torch.device("cuda")))
         show_profile(network)
         show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
 
         network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)   ## INV
-        show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
+        show_test_acc(test(dataloader, network, criterion, device), writer.log_dir)   ## CIFAR
     
 
 

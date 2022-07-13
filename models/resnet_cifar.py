@@ -84,7 +84,7 @@ class BasicBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes):
+    def __init__(self, block, num_blocks, num_classes, target_classes):
         super(ResNet, self).__init__()
         self.in_planes = 16
 
@@ -96,6 +96,12 @@ class ResNet(nn.Module):
         self.linear = nn.Linear(64, num_classes)
 
         self.apply(_weights_init)
+        if target_classes:
+            self.output_mask = torch.zeros(num_classes)
+            self.output_mask[target_classes] = 1
+        else:
+            self.output_mask = torch.ones(num_classes)
+        self.output_mask.to(torch.device('cuda:0'))
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -114,31 +120,32 @@ class ResNet(nn.Module):
         out = F.avg_pool2d(out, out.size()[3])
         out = out.view(out.size(0), -1)
         out = self.linear(out)
+        out = torch.mul(out, self.output_mask)
         return out
 
 
-def resnet20(num_classes=100):
-    return ResNet(BasicBlock, [3, 3, 3], num_classes)
+def resnet20(num_classes=100, target_classes=None):
+    return ResNet(BasicBlock, [3, 3, 3], num_classes, target_classes)
 
 
-def resnet32(num_classes):
-    return ResNet(BasicBlock, [5, 5, 5], num_classes)
+def resnet32(num_classes, target_classes):
+    return ResNet(BasicBlock, [5, 5, 5], num_classes, target_classes)
 
 
-def resnet44(num_classes):
-    return ResNet(BasicBlock, [7, 7, 7], num_classes)
+def resnet44(num_classes, target_classes):
+    return ResNet(BasicBlock, [7, 7, 7], num_classes, target_classes)
 
 
-def resnet56(num_classes):
-    return ResNet(BasicBlock, [9, 9, 9], num_classes)
+def resnet56(num_classes, target_classes):
+    return ResNet(BasicBlock, [9, 9, 9], num_classes, target_classes)
 
 
-def resnet110(num_classes):
-    return ResNet(BasicBlock, [18, 18, 18], num_classes)
+def resnet110(num_classes, target_classes):
+    return ResNet(BasicBlock, [18, 18, 18], num_classes, target_classes)
 
 
-def resnet1202(num_classes):
-    return ResNet(BasicBlock, [200, 200, 200], num_classes)
+def resnet1202(num_classes, target_classes):
+    return ResNet(BasicBlock, [200, 200, 200], num_classes, target_classes)
 
 
 def test(net):

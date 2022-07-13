@@ -2,8 +2,8 @@ data:
   for_trainNval: CIFAR100
   for_test: CIFAR100
 
-  target_for_trainNval: True  # 라쏘 프루닝때도 적용됨
-  target_for_test: True  # 테스트
+  target_for_trainNval: False  # 라쏘 프루닝때도 적용됨
+  target_for_test: False  # 테스트
 
   train:
     augmentation: null

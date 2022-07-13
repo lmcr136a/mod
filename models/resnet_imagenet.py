@@ -61,7 +61,7 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=10, imagenet=False):
+    def __init__(self, block, num_blocks, num_classes, target_classes, imagenet=False):
         super(ResNet, self).__init__()
         self.in_planes = 64
         if imagenet:
@@ -76,6 +76,12 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
         self.fc = nn.Linear(512*block.expansion, num_classes)
+        if target_classes:
+            self.output_mask = torch.zeros(num_classes)
+            self.output_mask[target_classes] = 1
+        else:
+            self.output_mask = torch.ones(num_classes)
+        self.output_mask = self.output_mask.to(torch.device('cuda:0'))
 
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)
@@ -94,25 +100,29 @@ class ResNet(nn.Module):
         out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         out = self.fc(out)
+        out = torch.mul(out, self.output_mask)
         return out
 
 
-def resnet18(num_classes):
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
+def resnet18(num_classes, target_classes):
+    print(target_classes)
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes, target_classes=target_classes)
+# 4 4 4 4
+# 1~4 5~8 9~12 13~16
+
+def resnet34(num_classes, target_classes, imagenet=False):
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes, target_classes=target_classes, imagenet=imagenet)
+# 6 8 12 6
+# 1~6 7~14 15~26 27~32
+
+def resnet50(num_classes, target_classes, imagenet=False):
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes, target_classes=target_classes, imagenet=imagenet)
 
 
-def resnet34(num_classes, imagenet=False):
-    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes, imagenet=imagenet)
+def resnet101(num_classes, target_classes):
+    return ResNet(Bottleneck, [3, 4, 23, 3], num_classes, target_classes=target_classes)
 
 
-def resnet50(num_classes, imagenet=False):
-    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes, imagenet=imagenet)
-
-
-def resnet101(num_classes):
-    return ResNet(Bottleneck, [3, 4, 23, 3], num_classes)
-
-
-def resnet152(num_classes):
-    return ResNet(Bottleneck, [3, 8, 36, 3], num_classes)
+def resnet152(num_classes, target_classes):
+    return ResNet(Bottleneck, [3, 8, 36, 3], num_classes, target_classes=target_classes)
 

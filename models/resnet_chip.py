@@ -1,4 +1,4 @@
-
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -91,7 +91,7 @@ class BasicBlock(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_layers, sparsity, num_classes=10):
+    def __init__(self, block, num_layers, sparsity, target_classes, num_classes=10):
         super(ResNet, self).__init__()
         assert (num_layers - 2) % 6 == 0, 'depth should be 6n+2'
         n = (num_layers - 2) // 6
@@ -116,6 +116,12 @@ class ResNet(nn.Module):
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.linear = nn.Linear(64 * BasicBlock.expansion, num_classes)
+        if target_classes:
+            self.output_mask = torch.zeros(num_classes)
+            self.output_mask[target_classes] = 1
+        else:
+            self.output_mask = torch.ones(num_classes)
+        self.output_mask.to(torch.device('cuda:0'))
 
 
     def _make_layer(self, block, blocks_num, stride):
@@ -147,12 +153,13 @@ class ResNet(nn.Module):
         x = x.view(x.size(0), -1)
 
         x = self.linear(x)
+        out = torch.mul(out, self.output_mask)
 
         return x
 
 
-def resnet56_chip(num_classes, sparsity):
-    return ResNet(BasicBlock, 56, sparsity=sparsity, num_classes=num_classes)
+def resnet56_chip(num_classes, sparsity, target_classes):
+    return ResNet(BasicBlock, 56, target_classes=target_classes, sparsity=sparsity, num_classes=num_classes)
 
-def resnet110_chip(num_classes, sparsity):
-    return ResNet(BasicBlock, 110, sparsity=sparsity, num_classes=num_classes)
+def resnet110_chip(num_classes, sparsity, target_classes):
+    return ResNet(BasicBlock, 110, target_classes=target_classes, sparsity=sparsity, num_classes=num_classes)

@@ -32,8 +32,8 @@ network:
     all_classes: false
     k: 0.15
     lasso:
-      saved_index: null
-    process_num: 5
+      saved_index: experiments/6set/lasso4_r34_6set/lasso4_6_15/total_indices_stayed.pt
+    process_num: null
 run:
   epoch: 50
   figure_interval: 50

@@ -34,40 +34,45 @@ def configuration(config, force_gpu, jupyter=False):
     KST = timezone('Asia/Seoul')
     now = datetime.datetime.utcnow()
     t = utc.localize(now).astimezone(KST)
+    time_info = f'{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
     # tb_dir = f'experiments/___{config.split(".")[0]}_{cfg["network"]["model"]}_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
-    tb_dir = f'experiments/{config.split(".")[0]}' #_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
+    if "/" in config:
+        exp_name = config.split("/")[-1].split(".")[0]
+    else:
+        exp_name = config.split(".")[0]
+        
+    tb_dir = f'experiments/{exp_name}' #_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
     writer = SummaryWriter(tb_dir)
     if not jupyter:
-        f = open(tb_dir+"/log.txt", 'w')
+        f = open(tb_dir+f"/log{time_info}.txt", 'w')
         sys.stdout = f
 
-        with open(tb_dir+"/"+config, "w") as f:
+        with open(tb_dir+"/"+exp_name+".yml", "w") as f:
             yaml.dump(cfg, f)
 
     return cfg, writer
 
-def write_result(log_dir):
-    with open(log_dir+"/log.txt", encoding="utf-8") as fp:
-        result_log = fp.read()
+def write_result(log_dir, result):
     KST = timezone('Asia/Seoul')
     now = datetime.datetime.utcnow()
     t = utc.localize(now).astimezone(KST)
     time_info = f'{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
 
-    result_log = result_log[-160:-140]
-    result_log = log_dir.split("/")[-1] + f"   {time_info}:     " + result_log + "\n\n"
+    result_log = log_dir.split("/")[-1] + f"   {time_info}:     Test acc: " + str(result) + "\n\n"
 
     with open("result_summary.txt", 'a') as rf:
         rf.write(result_log)
         
 
 
-def show_test_acc(result):
+def show_test_acc(result, log_dir=None):
     print('\n==========================================================')
     print('#                                                          #')
     print('#                  Test acc : {:.4f}                  #'.format(result))
     print('#                                                          #')
     print('==========================================================\n')
+    if log_dir:
+        write_result(log_dir, result)
 
 
 def show_profile(network):

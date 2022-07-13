@@ -13,9 +13,6 @@ def main(cfg_dir, force_gpu=None):
 
     run(cfg, writer)
     
-    time.sleep(10)
-    write_result(writer.log_dir)
-    
     sys.stdout = sys.__stdout__
 
 
