@@ -36,12 +36,14 @@ def configuration(config, force_gpu, jupyter=False):
     t = utc.localize(now).astimezone(KST)
     time_info = f'{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
     # tb_dir = f'experiments/___{config.split(".")[0]}_{cfg["network"]["model"]}_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
-    if "/" in config:
+    
+    if "/" in config:  # 6set/lasso1_1_5.yml
         exp_name = config.split("/")[-1].split(".")[0]
+        tb_dir = f'experiments/{config.split("/")[0]}/{exp_name}'
     else:
         exp_name = config.split(".")[0]
+        tb_dir = f'experiments/{exp_name}' #_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
         
-    tb_dir = f'experiments/{exp_name}' #_{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
     writer = SummaryWriter(tb_dir)
     if not jupyter:
         f = open(tb_dir+f"/log{time_info}.txt", 'w')
@@ -56,9 +58,9 @@ def write_result(log_dir, result):
     KST = timezone('Asia/Seoul')
     now = datetime.datetime.utcnow()
     t = utc.localize(now).astimezone(KST)
-    time_info = f'{num_(t.month)}{num_(t.day)}_{num_(t.hour)}{num_(t.minute)}{num_(t.second)}'
+    time_info = f'{num_(t.month)}월{num_(t.day)}일{num_(t.hour)}시{num_(t.minute)}분{num_(t.second)}초'
 
-    result_log = log_dir.split("/")[-1] + f"   {time_info}:     Test acc: " + str(result) + "\n\n"
+    result_log = f"{time_info}| {log_dir.split('/')[-1]}     " + str(round(result, 2)) + "\n\n"
 
     with open("result_summary.txt", 'a') as rf:
         rf.write(result_log)

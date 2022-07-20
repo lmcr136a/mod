@@ -14,8 +14,8 @@ from utils.utils import show_test_acc, show_profile
 from dataset import get_dataloader, get_test_dataloader
 from models.model import get_network
 
-from prunings.lasso import AssembleNetResNet
-from prunings.twinkle_lasso import TwinkleAssembleNetResNet
+from prunings.lasso import LASSOResNet
+from prunings.lasso_vgg import LASSOVGGBN
 from prunings.chip import calculate_ci, calculate_feature_map, prune_finetune_cifar
 from prunings.hrank import hrank_main, rank_generation
 from prunings.gal import get_gal_model, gal_main
@@ -34,100 +34,67 @@ def run(cfg, writer):
     if device == "cuda":
         torch.cuda.manual_seed(cfg_run["seed"])
         print(f"[ DEVICE  ] CUDA GPU available")
-
+        
     network = network.to(device)
     criterion = get_loss(cfg_run)
     optimizer = get_optimizer(cfg_run, network)
+    
+    if cfg['data'].get('target_classes', False):
+        output_mask = torch.zeros(n_class)
+        output_mask[cfg['data']['target_classes']] = 1
+    else:
+        output_mask = torch.ones(n_class)
+    output_mask = output_mask.to(torch.device('cuda:0'))
 
     print(f"[LOSS FUNC] {criterion}  [OPTIMIZER] {optimizer}")
-
+    
     if cfg["network"].get("load_state", None):
-        print("\n====================== LOADING STATES... =====================")
-        network.load_state_dict(torch.load(cfg["network"].get("load_state", None)),  strict=False)
+        if cfg["network"]['load_state'] != 'from pytorch':
+            print("\n====================== LOADING STATES... =====================")
+            network.load_state_dict(torch.load(cfg["network"].get("load_state", None)),  strict=False)
     else:
         print("\n====================== TRAINING START! =====================")
-        network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)
+        network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer, output_mask)
         torch.save(network.state_dict(), writer.log_dir+"/best_model.pt")
 
-    show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
+    show_test_acc(test(dataloader, network, criterion, device, output_mask))   ## CIFAR
     ################################################################
 
     # summary(network, torch.zeros((1, 3, 32, 32)).to(torch.device("cuda")))
     show_profile(network)
 
     if cfg["network"].get("pruning", None):
-        if cfg["network"]["pruning"].get("lasso", None) and not cfg["network"]["pruning"].get("iterative_lasso", None):
-            lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir, device)
-        elif cfg["network"]["pruning"].get("iterative_lasso", None):
-            iterative_lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer, device) ###
+        if cfg["network"]["pruning"].get("lasso", None):
+            lasso(cfg, dataloader, network, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("chip", None):
             network, optimizer, criterion = chip(network, cfg, dataloader, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("hrank", None):
             network = hrank(cfg, network, device, dataloader, criterion, n_class, writer.log_dir)
         elif cfg["network"]["pruning"].get("gal", None):
             network = gal(dataloader, network, cfg, device, writer.log_dir, n_class)
-        elif cfg["network"]["pruning"].get("twinkle", None):
-            twinkle(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir, device)
 
         network = network.to(torch.device("cuda"))
         
         # summary(network, torch.zeros((2, 3, 32, 32)).to(torch.device("cuda")))
         show_profile(network)
-        show_test_acc(test(dataloader, network, criterion, device))   ## CIFAR
+        show_test_acc(test(dataloader, network, criterion, device, output_mask))   ## CIFAR
 
-        network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer)   ## INV
-        show_test_acc(test(dataloader, network, criterion, device), writer.log_dir)   ## CIFAR
+        network = trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer, output_mask)   ## INV
+        show_test_acc(test(dataloader, network, criterion, device, output_mask), writer.log_dir)   ## CIFAR
     
 
-
-def iterative_lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer, device):
-    print("ITERATIVE LASSO START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-    iter_num = cfg['run']['iter_num'] ## 6
-    if not cfg['run'].get('hard_k', False):
-        iter_k = cfg['network']['pruning']['k'] ** (1/iter_num)
-        cfg['network']['pruning']['k'] = iter_k
-
-    if cfg["network"]["pruning"]["all_classes"]:
-        all_class_dataloader, _ = get_dataloader(cfg, get_only_targets=False)
+def lasso(cfg, dataloader, network, n_class, log_dir):
+    if 'resnet' in cfg['network']['model']:
+        lso = LASSOResNet(cfg["run"], dataloader, network, n_class)   ## INV
+    elif 'vgg' in cfg['network']['model']:
+        lso = LASSOVGGBN(cfg["run"], dataloader, network, n_class)   ## INV
     else:
-        all_class_dataloader = None
-        
-    start = time.time()
-    for i in range(iter_num):
-        network = trainNval(dataloader, network, cfg['run'], criterion, optimizer, device, writer)
-        lasso(cfg, dataloader, network, optimizer, criterion, n_class, writer.log_dir, \
-            device, all_class_dataloader=all_class_dataloader, save_i=i)
-        print(f'iter {i}.. {round((time.time()-start)//60)}min.. {round((time.time()-start)/3600, 1)}hour...')
-    network = trainNval(dataloader, network, cfg['run'], criterion, optimizer, device, writer)
+        print('check configuration')
 
-
-def lasso(cfg, dataloader, network, optimizer, criterion, n_class, log_dir, device, save_i=0, all_class_dataloader=None):
-    # print("LASSO START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-    agent = AssembleNetResNet(cfg["run"], dataloader, network, optimizer, criterion, n_class, device)   ## INV
-    agent.init_graph(pretrained=False)
     if cfg["network"]["pruning"]["all_classes"]:
-        if not all_class_dataloader:
-            all_class_dataloader, _ = get_dataloader(cfg, get_only_targets=False)
-        agent.data_loader = all_class_dataloader
-    #     agent.compress(log_dir, method=cfg["network"]["pruning"].get("method", "lasso"), k=cfg["network"]["pruning"].get("k", 0.49))
-    # else:
-    agent.lasso_compress(cfg["network"]["pruning"], log_dir, save_i=save_i)
+        lso.data_loader, _ = get_dataloader(cfg, get_only_targets=False)
+    lso.compress(cfg["network"]["pruning"], log_dir)
     
-
-def twinkle(cfg, dataloader, network, optimizer, criterion, n_class, log_dir, device):
-    print("twinkle START mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm")
-    agent = TwinkleAssembleNetResNet(cfg["run"], dataloader, network, optimizer, criterion, n_class, device)   ## INV
-    agent.init_graph(pretrained=False)
-    if cfg["network"]["pruning"]["all_classes"]:
-        all_class_dataloader, _ = get_dataloader(cfg, get_only_targets=False)
-        agent.data_loader = all_class_dataloader
-        agent.compress(log_dir, t_cfg=cfg["network"]["pruning"]["twinkle"])
-    else:
-        agent.lasso_compress(log_dir, t_cfg=cfg["network"]["pruning"]["twinkle"])
-
-
-
-
 
 def chip(network, cfg, dataloader, n_class, log_dir):
     cfg_network = cfg["network"]
@@ -172,7 +139,7 @@ def gal(dataloader, network, cfg, device, job_dir, n_class):
     return network
 
 
-def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer):
+def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer, output_mask):
     """
     cfg_run에 담긴대로 training/validation 진행
     가장 높은 validation accuracy를 가진 네트워크를 출력
@@ -196,10 +163,12 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
 
         network.train()
 
-        for inputs, labels in dataloader.train_loader:
+        for i, (inputs, labels) in enumerate(dataloader.train_loader):
             if print_label == 0 :
                 print_label = 1
                 print(labels[:20])
+            if i > 10000:
+                break
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
@@ -232,10 +201,10 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
             writer.add_scalar('Training loss',
                             LossMeter.avg,
                             epoch)
-        if (epoch+1) % cfg_run["figure_interval"] == 0:
-            writer.add_figure('training prediction',
-                            plot_classes_preds(network, inputs, labels),
-                            global_step=epoch)
+        # if (epoch+1) % cfg_run["figure_interval"] == 0:
+        #     writer.add_figure('training prediction',
+        #                     plot_classes_preds(network, inputs, labels),
+        #                     global_step=epoch)
         # Validation ##################################===============###########=========########
         if (epoch+1) % cfg_run["val_interval"] == 0:
             LossMeter = AverageMeter()
@@ -251,6 +220,7 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
                     labels = labels.to(device)
                     ## COMPUTE
                     output = network(inputs)
+                    output = torch.mul(output, output_mask)
                     labels = labels.to(torch.long)
                     loss = criterion(output, labels)
 
@@ -266,17 +236,17 @@ def trainNval(dataloader, network, cfg_run, criterion, optimizer, device, writer
                     i += 1
             print(f'**[Epoch {epoch+1}/{cfg_run["epoch"]}] [VAL] Loss {LossMeter.avg:.4f})\t Acc: {Top1Meter.avg:.3f})\t TotalTime: {round(TimeMeter.val/3600)}h {round(TimeMeter.val%3600/60)}min')
             print()
-            ##### plot
-            writer.add_scalar('Validation loss',
-                LossMeter.avg,
-                epoch )
-            writer.add_figure('validation prediction',
-                            plot_classes_preds(network, inputs, labels),
-                            global_step=epoch )
+            # ##### plot
+            # writer.add_scalar('Validation loss',
+            #     LossMeter.avg,
+            #     epoch )
+            # writer.add_figure('validation prediction',
+            #                 plot_classes_preds(network, inputs, labels),
+            #                 global_step=epoch )
     return best_network
 
 
-def test(dataloader, network, criterion, device):
+def test(dataloader, network, criterion, device, output_mask):
     """
     test accuracy 반환, 여기서도 dataset, dataloader는 dictionary type이다.
     """
@@ -291,14 +261,17 @@ def test(dataloader, network, criterion, device):
     i = 0
     print_label = 0
     with torch.no_grad():
-        for inputs, labels in dataloader.test_loader:
+        for i, (inputs, labels) in enumerate(dataloader.test_loader):
             if print_label == 0 :
                 print_label = 1
                 print(labels[:20])
+            if i > 1000:
+                break
             inputs = inputs.to(device)
             labels = labels.to(device)
             ## COMPUTE
             output = network(inputs)
+            output = torch.mul(output, output_mask)
             labels = labels.to(torch.long)
             loss = criterion(output, labels)
 

@@ -1,0 +1,48 @@
+data:
+  for_test: IMAGENET
+  for_trainNval: IMAGENET
+  # target_classes: 
+  target_for_test: false
+  target_for_trainNval: false
+  test:
+    batch_size: 64
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+  train:
+    augmentation: null
+    batch_size: 64
+    n_workers: 8
+    pin_memory: true
+    shuffle: true
+  val:
+    batch_size: 64
+    n_workers: 4
+    pin_memory: true
+    shuffle: false
+network:
+  load_state: false
+  model: resnet34
+run:
+  batch_size: 64
+  epoch: 10
+  figure_interval: 50
+  gpu_device: 7
+  loss: crossentropy
+  optimizer:
+    gamma: 0.5
+    lr: 0.01
+    milestones:
+    - 15
+    - 30
+    - 45
+    - 60
+    - 75
+    - 90
+    momentum: 0.9
+    name: adam
+    weight_decay: 0.0005
+  plot_interval: 10
+  print_interval: 1
+  seed: 9099
+  val_interval: 2

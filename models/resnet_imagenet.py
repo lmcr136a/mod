@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -76,6 +75,9 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
         self.fc = nn.Linear(512*block.expansion, num_classes)
+        self.num_classes = num_classes
+        if num_classes == 1000:
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         if target_classes:
             self.output_mask = torch.zeros(num_classes)
             self.output_mask[target_classes] = 1
@@ -97,15 +99,17 @@ class ResNet(nn.Module):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        out = F.avg_pool2d(out, 4)
+        if self.num_classes == 1000:
+            out = self.avgpool(out)
+        else:
+            out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
         out = self.fc(out)
-        out = torch.mul(out, self.output_mask)
+        # out = torch.mul(out, self.output_mask)
         return out
 
 
 def resnet18(num_classes, target_classes):
-    print(target_classes)
     return ResNet(BasicBlock, [2, 2, 2, 2], num_classes, target_classes=target_classes)
 # 4 4 4 4
 # 1~4 5~8 9~12 13~16

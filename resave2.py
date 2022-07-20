@@ -9,28 +9,30 @@ import os.path
 
 
 print_string = ''
-for ran_num in range(2, 4):
-    for exp_num in range(1, 7):
-        for k in [10, 20, 30, 40, 50]:
-            filename = f'lasso{ran_num}_{exp_num}_{k}_.yml'
-            path = f'configs/3set/{filename}'
+for ran_num in range(1, 2):
+    for exp_num in [1, 4]:
+        for k in [50, 60, 70, 80]:
+            filename = f'lasso{ran_num}_{exp_num}_{k}.yml'
+            path = f'configs/6set/{filename}'
             with open(path, encoding="utf-8") as fp:
                 cfg = yaml.load(fp, Loader=yaml.FullLoader)   
 
-            # cfg["network"]['pruning']["k"] = 0.6
-            del cfg["network"]['pruning']["process_num"]
-            # cfg["network"]['pruning']['lasso']['saved_index'] = None
-
+            cfg["network"]['model'] = 'resnet56'
+            cfg['data']['target_classes'] = [0,1,2]
+            cfg["network"]['load_state'] = 'models/pretrained/resnet56_cifar10.pt'
+            cfg['data']['for_test'] = cfg['data']['for_test'][:-1]
+            cfg['data']['for_trainNval'] = cfg['data']['for_trainNval'][:-1]
             # if ran_num == 2:
             #     cfg['data']['target_classes'] = [40, 83, 25, 53, 7, 11, 93, 51, 26, 74]
             # if ran_num == 3:
             #     cfg['data']['target_classes'] = [40, 83, 25, 53, 7, 11, 93, 51, 26, 74, 30, 78, 98, 17, 93, 63, 95,  2, 73, 14]
 
-            with open(path, "w") as f:
+            newname = f"rft/r56_cifar10_{exp_num}_{k}.yml"
+            with open(f'configs/{newname}', "w") as f:
                 yaml.dump(cfg, f)
-            print_string+= f"3set/{filename} "
+            print_string+= f"{newname} "
 
-# print(print_string)
+print(print_string)
 
 
 # # experiments 에서 가져와서 configs에 저장
@@ -53,3 +55,22 @@ for ran_num in range(2, 4):
 # for bid_dir in big_dirs:
 #     if os.path.isfile(bid_dir+"/total_indices_stayed_0.pt"):
 #         os.rename(bid_dir+"/total_indices_stayed_0.pt", bid_dir+"/total_indices_stayed.pt")
+
+
+
+# print_string = ''
+# for tnum in [50, 100, 200, 300]:
+#     # for k in [90, 80, 60, 40, 20]:
+#     path = f'configs/pns/vgg_{tnum}.yml'
+#     with open(path, encoding="utf-8") as fp:
+#         cfg = yaml.load(fp, Loader=yaml.FullLoader)  
+
+#     # cfg["network"]['load_state'] = 'from pytorch'
+#     cfg['data']['target_classes'] = list(range(tnum))
+
+#     with open( f'configs/pns/vgg_{tnum}.yml', "w") as f:
+#         yaml.dump(cfg, f)
+
+#     # print_string+= f"pns/vgg_{tnum}_{k}.yml "
+        
+# # print(print_string)

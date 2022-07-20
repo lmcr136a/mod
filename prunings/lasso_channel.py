@@ -25,114 +25,58 @@ def channel_selection(inputs, module, sparsity=0.5, method='greedy'):
     num_pruned = int(math.ceil(num_channel * sparsity))  # 입력된 sparsity 에 맞춰 삭제되어야 하는 채널 수
     num_stayed = num_channel - num_pruned
 
-    # if method == 'greedy':
-    #     indices_pruned = []
-    #     while len(indices_pruned) < num_pruned:
-    #         min_diff = 1e10
-    #         min_idx = 0
-    #         for idx in range(num_channel):
-    #             if idx in indices_pruned:
-    #                 continue
-    #             indices_try = indices_pruned + [idx]
-    #             inputs_try = torch.zeros_like(inputs)
-    #             inputs_try[:, indices_try, ...] = inputs[:, indices_try, ...]
-    #             output_try = module(inputs_try)
-    #             output_try_norm = output_try.norm(2)
-    #             if output_try_norm < min_diff:
-    #                 min_diff = output_try_norm
-    #                 min_idx = idx
-    #         indices_pruned.append(min_idx)
+    y = module(inputs)
 
-    #     print('indices_pruned !!! ', indices_pruned)
+    if module.bias is not None:  # bias.shape = [N]
+        bias_size = [1] * y.dim()  # bias_size: [1, 1, 1, 1]
+        bias_size[1] = -1  # [1, -1, 1, 1]
+        bias = module.bias.view(bias_size)  # bias.view([1, -1, 1, 1] = [1, N, 1, 1])
+        y -= bias  # output feature 에서 bias 만큼을 빼줌 (y - b)
+    else:
+        bias = 0.
+    y = y.view(-1).data.cpu().numpy()  # flatten all of outputs
+    y_channel_spread = []
+    for i in range(num_channel):
+        x_channel_i = torch.zeros_like(inputs)
+        x_channel_i[:, i, ...] = inputs[:, i, ...]
+        y_channel_i = module(x_channel_i) - bias
+        y_channel_spread.append(y_channel_i.data.view(-1, 1))
+    y_channel_spread = torch.cat(y_channel_spread, dim=1).cpu()
 
-    #     indices_stayed = list(set([i for i in range(num_channel)]) - set(indices_pruned))
+    alpha = 1e-7
+    solver = Lasso(alpha=alpha, warm_start=True, selection='random', random_state=0)
 
-    # elif method == 'greedy_GM':
-    #     indices_stayed = []
-    #     while len(indices_stayed) < num_stayed:
-    #         max_farthest_channel_norm = 1e-10
-    #         farthest_channel_idx = 0
+    # 원하는 수의 채널이 삭제될 때까지 alpha 값을 조금씩 늘려나감
+    alpha_l, alpha_r = 0, alpha
+    num_pruned_try = 0
 
-    #         for idx in range(num_channel):
-    #             if idx in indices_stayed:
-    #                 continue
-    #             indices_try = indices_stayed + [idx]
-    #             inputs_try = torch.zeros_like(inputs)
-    #             inputs_try[:, indices_try, ...] = inputs[:, indices_try, ...]
-    #             output_try = module(inputs_try).view(num_channel,-1).cpu().detach().numpy()
-    #             similar_matrix = distance.cdist(output_try, output_try,'euclidean')
-    #             similar_sum = np.sum(np.abs(similar_matrix), axis=0)
-    #             similar_large_index = similar_sum.argsort()[-1]
-    #             farthest_channel_norm= np.linalg.norm(similar_sum[similar_large_index])
+    while num_pruned_try < num_pruned:
+        alpha_r *= 2
+        solver.alpha = alpha_r
+        solver.fit(y_channel_spread,y)
+        num_pruned_try = sum(solver.coef_ == 0)
 
-    #             if max_farthest_channel_norm < farthest_channel_norm :
-    #                 max_farthest_channel_norm = farthest_channel_norm
-    #                 farthest_channel_idx = idx
+    # 충분하게 pruning 되는 alpha 를 찾으면, 이후 alpha 값의 좌우를 좁혀 나가면서 좀 더 정확한 alpha 값을 찾음
+    num_pruned_max = int(num_pruned)
 
-    #         print(farthest_channel_idx)
-    #         indices_stayed.append(farthest_channel_idx)
+    count = 0
+    while True:
+        count += 1
+        alpha = (alpha_l + alpha_r) / 2
+        solver.alpha = alpha
+        solver.fit(y_channel_spread,y)
+        num_pruned_try = sum(solver.coef_ == 0)
 
-    #     print('indices_stayed !!! ', indices_stayed)
+        if count > 30:
+            print("count > threshold", "  num pruned: ", num_pruned, "  num_pruned_try: ", num_pruned_try)
+            break
 
-    #     indices_pruned = list(set([i for i in range(num_channel)]) - set(indices_stayed))
-
-
-
-
-    if method == 'lasso':
-        y = module(inputs)
-
-        if module.bias is not None:  # bias.shape = [N]
-            bias_size = [1] * y.dim()  # bias_size: [1, 1, 1, 1]
-            bias_size[1] = -1  # [1, -1, 1, 1]
-            bias = module.bias.view(bias_size)  # bias.view([1, -1, 1, 1] = [1, N, 1, 1])
-            y -= bias  # output feature 에서 bias 만큼을 빼줌 (y - b)
+        if num_pruned_try > num_pruned_max:
+            alpha_r = alpha
+        elif num_pruned_try < num_pruned:
+            alpha_l = alpha
         else:
-            bias = 0.
-        y = y.view(-1).data.cpu().numpy()  # flatten all of outputs
-        y_channel_spread = []
-        for i in range(num_channel):
-            x_channel_i = torch.zeros_like(inputs)
-            x_channel_i[:, i, ...] = inputs[:, i, ...]
-            y_channel_i = module(x_channel_i) - bias
-            y_channel_spread.append(y_channel_i.data.view(-1, 1))
-        y_channel_spread = torch.cat(y_channel_spread, dim=1).cpu()
-
-        alpha = 1e-7
-        solver = Lasso(alpha=alpha, warm_start=True, selection='random', random_state=0)
-
-        # 원하는 수의 채널이 삭제될 때까지 alpha 값을 조금씩 늘려나감
-        alpha_l, alpha_r = 0, alpha
-        num_pruned_try = 0
-
-        while num_pruned_try < num_pruned:
-            alpha_r *= 2
-            solver.alpha = alpha_r
-            solver.fit(y_channel_spread,y)
-            num_pruned_try = sum(solver.coef_ == 0)
-
-        # 충분하게 pruning 되는 alpha 를 찾으면, 이후 alpha 값의 좌우를 좁혀 나가면서 좀 더 정확한 alpha 값을 찾음
-        num_pruned_max = int(num_pruned)
-
-        count = 0
-        while True:
-            count += 1
-            # print("second while count: ", count, "  num pruned: ", num_pruned, "  num_pruned_try: ", num_pruned_try)
-            alpha = (alpha_l + alpha_r) / 2
-            solver.alpha = alpha
-            solver.fit(y_channel_spread,y)
-            num_pruned_try = sum(solver.coef_ == 0)
-
-            if count > 30:
-                print("count > threshold", "  num pruned: ", num_pruned, "  num_pruned_try: ", num_pruned_try)
-                break
-
-            if num_pruned_try > num_pruned_max:
-                alpha_r = alpha
-            elif num_pruned_try < num_pruned:
-                alpha_l = alpha
-            else:
-                break
+            break
 
 
 

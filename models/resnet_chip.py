@@ -153,7 +153,7 @@ class ResNet(nn.Module):
         x = x.view(x.size(0), -1)
 
         x = self.linear(x)
-        out = torch.mul(out, self.output_mask)
+        # out = torch.mul(x, self.output_mask)
 
         return x
 

@@ -3,6 +3,7 @@ Cifar100 Dataloader implementation
 """
 from ast import Raise
 import logging
+from pickle import TRUE
 from pkgutil import get_data
 import numpy as np
 import copy
@@ -169,6 +170,7 @@ class InversionDataLoader:
             tmean, tstd = get_mean_std(train_set)
             vmean, vstd = get_mean_std(valid_set)
             testmean, teststd = get_mean_std(test_set)
+            print(tmean, tstd, vmean, vstd, testmean, teststd)
 
         if class_num == 1000:
             tfs = [transforms.Resize(256), transforms.CenterCrop(224)]
